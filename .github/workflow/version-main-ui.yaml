@@ -1,0 +1,35 @@
+name: Semantic Release
+
+on:
+  workflow_call:
+    outputs:
+      version:
+        description: "The first output string"
+        value: ${{ jobs.semantic_release.outputs.version }}
+
+jobs:
+  semantic_release:
+    runs-on: ubuntu-latest
+    outputs:
+      version:
+        value: ${{ steps.set-version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Run semantic release
+        id: semantic
+        run: npx semantic-release
+
+      - name: Set output version
+        id: set-version
+        run: echo "version=$(jq -r .version package.json)" >> $GITHUB_ENV
+
