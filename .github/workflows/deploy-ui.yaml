@@ -53,4 +53,4 @@ jobs:
       - name: Sync to S3
         run: |
           aws s3 rm s3://${{ inputs.s3_bucket }}/ --recursive
-          aws s3 sync dist/ s3://${{ inputs.s3_bucket }}/ --delete
+          aws s3 sync dist s3://${{ inputs.s3_bucket }}/ --delete
