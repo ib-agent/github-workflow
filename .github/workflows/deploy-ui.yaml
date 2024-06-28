@@ -34,7 +34,7 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Pull Docker image
+      - name: Pull Docker image and extract artifact
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{secrets.ECR_REPOSITORY_NAME}}
@@ -42,11 +42,13 @@ jobs:
         run: |
           docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker create --name extract_container $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker cp extract_container:/artifact.zip artifact.zip
+          docker cp extract_container:/app/build.zip ./build.zip
           docker rm extract_container
 
-      - name: Unzip artifact
-        run: unzip artifact.zip -d dist
+      - name: Unzip artifact using busybox
+        run: |
+          mkdir dist
+          docker run --rm -v $(pwd):/work alpine:3.14 /bin/sh -c "cd /work && busybox unzip build.zip -d dist"
 
       - name: Sync to S3
         run: aws s3 sync dist/ s3://${{ inputs.s3_bucket }}/
