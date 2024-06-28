@@ -35,9 +35,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: npx semantic-release
 
-      - name: Set output version
-        id: set-version
+      - name: get current version tag
+        id: version
         run: |
-          cat package.json
-          echo jq -r .version package.json
-          echo "version=$(jq -r .version package.json)" >> $GITHUB_ENV
+          git fetch --tags
+          LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+          echo "LATEST_TAG=$LATEST_TAG"
+          echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
