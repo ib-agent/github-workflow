@@ -1,0 +1,52 @@
+name: Deploy UI
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version number'
+        required: true
+        type: string
+      s3_bucket:
+        description: 'S3 Bucket Name'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Pull Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{secrets.ECR_REPOSITORY_NAME}}
+          IMAGE_TAG: ${{ inputs.version }}
+        run: |
+          docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker create --name extract_container $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker cp extract_container:/artifact.zip artifact.zip
+          docker rm extract_container
+
+      - name: Unzip artifact
+        run: unzip artifact.zip -d dist
+
+      - name: Sync to S3
+        run: aws s3 sync dist/ s3://${{ inputs.s3_bucket }}/
