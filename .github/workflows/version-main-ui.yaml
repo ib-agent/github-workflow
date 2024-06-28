@@ -10,9 +10,6 @@ on:
 jobs:
   semantic_release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write #allow the job to write back to the repo for changelog
-
     outputs:
       version: ${{ steps.set-version.outputs.version }}
     steps:
