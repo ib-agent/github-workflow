@@ -24,27 +24,27 @@ jobs:
           role-to-assume: ${{ secrets.ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Verify assumed role
-        run: |
-          aws sts get-caller-identity
-          aws iam get-role --role-name GitHubActionsRole
-        continue-on-error: true
-
-      - name: Debug S3 Acceleration
-        run: |
-          aws s3api get-bucket-accelerate-configuration --bucket helloworld-ui-bucket
-        continue-on-error: true
+#      - name: Verify assumed role
+#        run: |
+#          aws sts get-caller-identity
+#          aws iam get-role --role-name GitHubActionsRole
+#        continue-on-error: true
+#
+#      - name: Debug S3 Acceleration
+#        run: |
+#          aws s3api get-bucket-accelerate-configuration --bucket helloworld-ui-bucket
+#        continue-on-error: true
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.7
 
-      - name: Verify Terraform and AWS CLI versions
-        run: |
-          terraform version
-          aws --version
-        continue-on-error: true
+#      - name: Verify Terraform and AWS CLI versions
+#        run: |
+#          terraform version
+#          aws --version
+#        continue-on-error: true
 
       - name: Terraform Init
         run: terraform init
@@ -52,10 +52,10 @@ jobs:
       - name: Terraform Plan
         id: plan
         run: terraform plan -detailed-exitcode -out=plan.tfplan
-        env:
-          TF_LOG: DEBUG
-          AWS_SDK_LOAD_CONFIG: 1
-          AWS_DEBUG: 1
+#        env:
+#          TF_LOG: DEBUG
+#          AWS_SDK_LOAD_CONFIG: 1
+#          AWS_DEBUG: 1
 
       - name: Terraform Apply
         if: steps.plan.outputs.exitcode == '2'
