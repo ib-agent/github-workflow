@@ -60,7 +60,3 @@ jobs:
       - name: Terraform Apply
         if: steps.plan.outputs.exitcode == '2'
         run: terraform apply -auto-approve plan.tfplan
-
-      - name: Set plan result
-        id: set-plan-result
-        run: echo "::set-output name=plan_has_changes::$(if [ "$?" -eq 2 ]; then echo 'true'; else echo 'false'; fi)"
