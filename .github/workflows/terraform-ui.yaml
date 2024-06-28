@@ -24,6 +24,10 @@ jobs:
           role-to-assume: ${{ secrets.ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Debug S3 Acceleration
+        run: |
+          aws s3api get-bucket-accelerate-configuration --bucket helloworld-ui-bucket
+
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
