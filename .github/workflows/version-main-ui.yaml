@@ -36,7 +36,7 @@ jobs:
         run: npx semantic-release
 
       - name: get current version tag
-        id: version
+        id: set-version
         run: |
           git fetch --tags
           LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
