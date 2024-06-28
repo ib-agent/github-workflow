@@ -11,8 +11,7 @@ jobs:
   semantic_release:
     runs-on: ubuntu-latest
     outputs:
-      version:
-        value: ${{ steps.set-version.outputs.version }}
+      version: ${{ steps.set-version.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -31,5 +30,8 @@ jobs:
 
       - name: Set output version
         id: set-version
-        run: echo "version=$(jq -r .version package.json)" >> $GITHUB_ENV
+        run: |
+          cat package.json
+          echo jq -r .version package.json
+          echo "version=$(jq -r .version package.json)" >> $GITHUB_ENV
 
