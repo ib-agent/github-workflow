@@ -1,0 +1,44 @@
+name: Semantic Release
+
+on:
+  workflow_call:
+    outputs:
+      version:
+        description: "The first output string"
+        value: ${{ jobs.semantic_release.outputs.version }}
+
+jobs:
+  semantic_release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set-version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install semantic-release and plugins
+        run: |
+          npm install semantic-release 
+          npm install @semantic-release/commit-analyzer @semantic-release/changelog @semantic-release/git @semantic-release/github
+
+      - name: Run semantic release
+        id: semantic
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npx semantic-release
+
+      - name: get current version tag
+        id: set-version
+        run: |
+          git fetch --tags
+          LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+          echo "LATEST_TAG=$LATEST_TAG"
+          echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
