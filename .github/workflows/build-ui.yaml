@@ -7,6 +7,26 @@ on:
         description: 'Version number'
         required: true
         type: string
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
+      react_app_datadog_client_token:
+        description: 'Datadog Client Token'
+        required: true
+        type: string
+      react_app_datadog_application_id:
+        description: 'Datadog Application ID'
+        required: true
+        type: string
+      react_app_dd_site:
+        description: 'Datadog Site'
+        required: true
+        type: string
+      react_app_service_name:
+        description: 'Service Name'
+        required: true
+        type: string
 
 permissions:
   id-token: write
@@ -41,12 +61,12 @@ jobs:
 
       - name: Build project
         env:
-          REACT_APP_DATADOG_CLIENT_TOKEN: ${{ env.REACT_APP_DATADOG_CLIENT_TOKEN }}
-          REACT_APP_DATADOG_APPLICATION_ID: ${{ env.REACT_APP_DATADOG_APPLICATION_ID }}
-          REACT_APP_DD_SITE: ${{ env.REACT_APP_DD_SITE }}
+          REACT_APP_DATADOG_CLIENT_TOKEN: ${{ inputs.react_app_datadog_client_token }}
+          REACT_APP_DATADOG_APPLICATION_ID: ${{ inputs.react_app_datadog_application_id }}
+          REACT_APP_DD_SITE: ${{ inputs.react_app_dd_site }}
           REACT_APP_VERSION: ${{ inputs.version }}
-          REACT_APP_ENV: ${{ env.REACT_APP_ENV }}
-          REACT_APP_SERVICE_NAME: ${{ github.repository }}
+          REACT_APP_ENV: ${{ inputs.environment }}
+          REACT_APP_SERVICE_NAME: ${{ inputs.react_app_service_name }}
         run: yarn build
 
       - name: Zip distribution contents
