@@ -18,6 +18,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Debug AWS credentials configuration
+        run: |
+          echo "Assuming role: ${{ secrets.ROLE_TO_ASSUME }}"
+          echo "AWS region: ${{ secrets.AWS_REGION }}"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -29,16 +34,12 @@ jobs:
           echo "Assuming role: ${{ secrets.ROLE_TO_ASSUME }}"
           echo "AWS region: ${{ secrets.AWS_REGION }}"
           aws sts get-caller-identity
-#      - name: Verify assumed role
-#        run: |
-#          aws sts get-caller-identity
-#          aws iam get-role --role-name GitHubActionsRole
-#        continue-on-error: true
-#
-#      - name: Debug S3 Acceleration
-#        run: |
-#          aws s3api get-bucket-accelerate-configuration --bucket helloworld-ui-bucket
-#        continue-on-error: true
+
+      - name: Verify assumed role
+        run: |
+          aws sts get-caller-identity
+          aws iam get-role --role-name GitHubActionsRole
+        continue-on-error: true
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
