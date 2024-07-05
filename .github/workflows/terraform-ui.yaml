@@ -24,6 +24,11 @@ jobs:
           role-to-assume: ${{ secrets.ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Debug AWS credentials configuration
+        run: |
+          echo "Assuming role: ${{ secrets.ROLE_TO_ASSUME }}"
+          echo "AWS region: ${{ secrets.AWS_REGION }}"
+          aws sts get-caller-identity
 #      - name: Verify assumed role
 #        run: |
 #          aws sts get-caller-identity
