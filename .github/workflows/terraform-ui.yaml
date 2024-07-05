@@ -26,19 +26,17 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.ROLE_TO_ASSUME }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: arn:aws:iam::905418256626:role/CommonGitHubActionsRole
+          aws-region: us-west-2
 
       - name: Debug AWS credentials configuration
         run: |
-          echo "Assuming role: ${{ secrets.ROLE_TO_ASSUME }}"
-          echo "AWS region: ${{ secrets.AWS_REGION }}"
           aws sts get-caller-identity
 
       - name: Verify assumed role
         run: |
           aws sts get-caller-identity
-          aws iam get-role --role-name GitHubActionsRole
+          aws iam get-role --role-name CommonGitHubActionsRole
         continue-on-error: true
 
       - name: Set up Terraform
