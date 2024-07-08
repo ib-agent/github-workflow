@@ -1,6 +1,12 @@
 name: Terraform
 
-on: workflow_call
+on:
+  workflow_call:
+    inputs:
+      github_repository:
+        description: 'The GitHub repository name'
+        required: true
+        type: string
 
 permissions:
   id-token: write
@@ -18,37 +24,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Debug AWS credentials configuration
-        run: |
-          echo "Assuming role: ${{ secrets.ROLE_TO_ASSUME }}"
-          echo "AWS region: ${{ secrets.AWS_REGION }}"
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::905418256626:role/CommonGitHubActionsRole
-          aws-region: us-west-2
+          role-to-assume: ${{ secrets.ROLE_TO_ASSUME }}"
+          aws-region: ${{ secrets.AWS_REGION }}"
 
       - name: Debug AWS credentials configuration
         run: |
           aws sts get-caller-identity
-
-      - name: Verify assumed role
-        run: |
-          aws sts get-caller-identity
-          aws iam get-role --role-name CommonGitHubActionsRole
-        continue-on-error: true
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.7
-
-#      - name: Verify Terraform and AWS CLI versions
-#        run: |
-#          terraform version
-#          aws --version
-#        continue-on-error: true
 
       - name: Terraform Init
         run: terraform init
@@ -56,11 +45,17 @@ jobs:
       - name: Terraform Plan
         id: plan
         run: terraform plan -detailed-exitcode -out=plan.tfplan
-#        env:
-#          TF_LOG: DEBUG
-#          AWS_SDK_LOAD_CONFIG: 1
-#          AWS_DEBUG: 1
+        env:
+          TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+          TF_VAR_region: ${{ secrets.AWS_REGION }}
+          TF_VAR_github_repository: ${{ inputs.github_repository }}
+          TF_VAR_github_username: ${{ secrets.WORKFLOW_USERNAME }}
 
       - name: Terraform Apply
         if: steps.plan.outputs.exitcode == '2'
         run: terraform apply -auto-approve plan.tfplan
+        env:
+          TF_VAR_aws_account_id: ${{ secrets.AWS_ACCOUNT_ID }}
+          TF_VAR_region: ${{ secrets.AWS_REGION }}
+          TF_VAR_github_repository: ${{ inputs.github_repository }}
+          TF_VAR_github_username: ${{ secrets.WORKFLOW_USERNAME }}
