@@ -39,6 +39,12 @@ jobs:
         with:
           terraform_version: 1.5.7
 
+      - name: Set up GitHub authentication for Terraform modules
+        run: |
+          git config --global url."https://$GITHUB_TOKEN:@github.com/".insteadOf "https://github.com/"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
       - name: Terraform Init
         run: terraform init
         env:
