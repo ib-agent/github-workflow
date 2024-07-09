@@ -11,6 +11,18 @@ on:
         description: 'S3 Bucket Name'
         required: true
         type: string
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      role_to_assume:
+        description: 'AWS Role to Assume'
+        required: true
+        type: string
+      ecr_repository_name:
+        description: 'AWS ECR Repository'
+        required: true
+        type: string
 
 permissions:
   id-token: write
@@ -27,8 +39,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.ROLE_TO_ASSUME }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ inputs.role_to_assume }}
+          aws-region: ${{ inputs.aws_region }}
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -37,7 +49,7 @@ jobs:
       - name: Pull Docker image and extract artifact
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{secrets.ECR_REPOSITORY_NAME}}
+          ECR_REPOSITORY: ${{inputs.ecr_repository_name}}
           IMAGE_TAG: ${{ inputs.version }}
         run: |
           docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG

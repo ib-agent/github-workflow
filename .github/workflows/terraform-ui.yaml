@@ -11,6 +11,14 @@ on:
         description: 'The AWS account id'
         required: true
         type: string
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      role_to_assume:
+        description: 'AWS Role to Assume'
+        required: true
+        type: string
 
 permissions:
   id-token: write
@@ -31,8 +39,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.ROLE_TO_ASSUME }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ inputs.role_to_assume }}
+          aws-region: ${{ inputs.aws_region }}
 
       - name: Debug AWS credentials configuration
         run: |
@@ -59,7 +67,7 @@ jobs:
         run: terraform plan -detailed-exitcode -out=plan.tfplan
         env:
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
-          TF_VAR_region: ${{ secrets.AWS_REGION }}
+          TF_VAR_region: ${{ inputs.aws_region }}
           TF_VAR_github_repository: ${{ inputs.github_repository }}
           TF_VAR_github_username: ${{ secrets.WORKFLOW_USERNAME }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -69,7 +77,7 @@ jobs:
         run: terraform apply -auto-approve plan.tfplan
         env:
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
-          TF_VAR_region: ${{ secrets.AWS_REGION }}
+          TF_VAR_region: ${{ inputs.aws_account_id }}
           TF_VAR_github_repository: ${{ inputs.github_repository }}
           TF_VAR_github_username: ${{ secrets.WORKFLOW_USERNAME }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
