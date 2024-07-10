@@ -1,0 +1,11 @@
+{
+  "branches": ["main"],
+  "repositoryUrl": "https://github.com/ib-agent/github-workflow",
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    "@semantic-release/changelog",
+    "@semantic-release/github"
+  ],
+  "tagFormat": "${version}"
+}
