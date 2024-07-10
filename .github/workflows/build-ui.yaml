@@ -40,7 +40,7 @@ on:
         required: true
         type: string
       env_tag:
-        description: 'The environment we're building for'
+        description: 'The environment to build for'
         required: true
         type: string
 
