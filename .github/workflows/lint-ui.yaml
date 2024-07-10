@@ -19,6 +19,7 @@ jobs:
 
       - name: Run ESLint
         run: yarn lint
+        
   snyk:
       runs-on: ubuntu-latest
       steps:
