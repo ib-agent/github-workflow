@@ -19,6 +19,10 @@ on:
         description: 'AWS Role to Assume'
         required: true
         type: string
+      environment:
+        description: 'the environment name for the tf workspace/state'
+        required: true
+        type: string
 
 permissions:
   id-token: write
@@ -58,7 +62,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Init
-        run: terraform init
+        run: ./terraform-init.sh ${{ inputs.environment }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
