@@ -1,0 +1,16 @@
+name: Post Deployment Tests
+
+on: [workflow_call]
+
+jobs:
+  post-deployment-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Newman
+        run: npm install -g newman
+
+      - name: Run Postman tests
+        run: newman run tests/postman/postman_collection.json
