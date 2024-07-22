@@ -2,14 +2,15 @@ name: Post Deployment Tests
 
 on:
   workflow_call:
-    environment:
-      description: 'Environment'
-      required: true
-      type: string
-    project_name:
-      description: 'Project Name'
-      required: true
-      type: string
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
+      project_name:
+        description: 'Project Name'
+        required: true
+        type: string
 jobs:
   post-deployment-tests:
     runs-on: ubuntu-latest
