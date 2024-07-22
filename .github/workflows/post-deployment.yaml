@@ -1,7 +1,15 @@
 name: Post Deployment Tests
 
-on: [workflow_call]
-
+on:
+  workflow_call:
+    environment:
+      description: 'Environment'
+      required: true
+      type: string
+    project_name:
+      description: 'Project Name'
+      required: true
+      type: string
 jobs:
   post-deployment-tests:
     runs-on: ubuntu-latest
@@ -9,8 +17,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Install Newman
         run: npm install -g newman
 
       - name: Run Postman tests
-        run: newman run tests/postman/postman_collection.json
+        run: newman run tests/postman/${{ inputs.project_name }}.postman_collection.json -e tests/${{ inputs.environment }}.postman_environment.json
