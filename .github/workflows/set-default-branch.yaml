@@ -1,0 +1,22 @@
+name: Set Default Branch
+
+on:
+  workflow_call:
+    inputs:
+      gh_token:
+        description: 'GitHub Token'
+        required: true
+        type: string
+
+jobs:
+  set-default-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install GitHub CLI
+        run: sudo apt-get install -y gh
+
+      - name: Authenticate GitHub CLI
+        run: echo ${{ inputs.gh_token }} | gh auth login --with-token
+
+      - name: Set Default Branch
+        run: gh repo edit ${{ github.repository }} --default-branch main
