@@ -87,7 +87,9 @@ jobs:
 
       - name: Zip distribution contents
         run: |
-          zip -r artifact.zip .next next.config.js
+          cd dist
+          zip -r ../artifact.zip .
+          cd ..
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
