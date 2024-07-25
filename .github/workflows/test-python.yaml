@@ -24,14 +24,9 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          coverage run -m pytest
-          coverage report
-          coverage xml
+          coverage run --rcfile=.coveragerc -m pytest
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: true
+      - name: Enforce Coverage Threshold
+        run: |
+          coverage report --rcfile=.coveragerc
+          coverage report --fail-under=80  # Ensure this matches the threshold in .coveragerc
