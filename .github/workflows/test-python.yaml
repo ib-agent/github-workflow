@@ -29,4 +29,3 @@ jobs:
       - name: Enforce Coverage Threshold
         run: |
           coverage report --rcfile=.coveragerc
-          coverage report --fail-under=80  # Ensure this matches the threshold in .coveragerc
