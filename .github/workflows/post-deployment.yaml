@@ -12,6 +12,37 @@ on:
         required: true
         type: string
 jobs:
+  stabilize:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y awscli
+
+      - name: Get ECS Cluster Name from SSM
+        id: get_cluster_name
+        run: |
+          CLUSTER_NAME=$(aws ssm get-parameter --name "/common-infrastructure/cabernet_ai_ecs_cluster_id" --query "Parameter.Value" --output text)
+          echo "CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Wait for ECS Service to Stabilize
+        id: wait
+        run: |
+          SERVICE_NAME=${{ inputs.project_name }}-service
+          echo "Waiting for ECS service $SERVICE_NAME to stabilize..."
+          aws ecs wait services-stable --cluster ${{ env.CLUSTER_NAME }} --services $SERVICE_NAME
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
   post-deployment-tests:
     runs-on: ubuntu-latest
     steps:
