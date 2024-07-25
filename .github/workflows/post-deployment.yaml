@@ -11,6 +11,10 @@ on:
         description: 'Project Name'
         required: true
         type: string
+
+env:
+  AWS_DEFAULT_REGION: us-west-2
+
 jobs:
   stabilize:
     runs-on: ubuntu-latest
