@@ -11,9 +11,14 @@ on:
         description: 'Project Name'
         required: true
         type: string
-
-env:
-  AWS_DEFAULT_REGION: us-west-2
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      role_to_assume:
+        description: 'AWS Role to Assume'
+        required: true
+        type: string
 
 jobs:
   stabilize:
@@ -23,19 +28,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install AWS CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y awscli
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.role_to_assume }}
+          aws-region: ${{ inputs.aws_region }}
 
       - name: Get ECS Cluster Name from SSM
         id: get_cluster_name
         run: |
           CLUSTER_NAME=$(aws ssm get-parameter --name "/common-infrastructure/cabernet_ai_ecs_cluster_id" --query "Parameter.Value" --output text)
           echo "CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Wait for ECS Service to Stabilize
         id: wait
@@ -43,9 +46,7 @@ jobs:
           SERVICE_NAME=${{ inputs.project_name }}-service
           echo "Waiting for ECS service $SERVICE_NAME to stabilize..."
           aws ecs wait services-stable --cluster ${{ env.CLUSTER_NAME }} --services $SERVICE_NAME
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
 
   post-deployment-tests:
     runs-on: ubuntu-latest
