@@ -3,12 +3,8 @@ name: Post Deployment Tests
 on:
   workflow_call:
     inputs:
-      aws_region:
-        description: 'AWS Region'
-        required: true
-        type: string
-      role_to_assume:
-        description: 'AWS Role to Assume'
+      environment:
+        description: 'The environment to test'
         required: true
         type: string
 
@@ -19,6 +15,7 @@ permissions:
 jobs:
   post-deployment-tests:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
