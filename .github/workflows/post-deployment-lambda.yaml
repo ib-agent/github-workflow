@@ -18,31 +18,31 @@ permissions:
 
 jobs:
   post-deployment-tests:
-  runs-on: ubuntu-latest
-  environment: development
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-    - name: Install dependencies
-      run: |
-        cd app
-        pip install -r requirements.txt
-        cd ../tests
-        pip install -r requirements_test.txt
+      - name: Install dependencies
+        run: |
+          cd app
+          pip install -r requirements.txt
+          cd ../tests
+          pip install -r requirements_test.txt
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
-        aws-region: ${{ vars.AWS_REGION }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
 
-    - name: Run tests
-      run: |
-        cd tests/post-deployment
-        pytest
+      - name: Run tests
+        run: |
+          cd tests/post-deployment
+          pytest
