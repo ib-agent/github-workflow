@@ -23,7 +23,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: ./tf/main
+        working-directory: ./tf
 
     steps:
       - name: Checkout repository
