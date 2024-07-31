@@ -3,10 +3,6 @@ name: Deploy Lambda
 on:
   workflow_call:
     inputs:
-      environment:
-        description: 'Environment'
-        required: true
-        type: string
       project_name:
         description: 'Project Name'
         required: true
@@ -34,7 +30,6 @@ permissions:
 
 jobs:
   upload:
-    environment: development
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
