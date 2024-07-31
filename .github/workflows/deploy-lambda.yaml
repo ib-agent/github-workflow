@@ -7,6 +7,10 @@ on:
         description: 'The environment to deploy to'
         required: true
         type: string
+    outputs:
+      checksum:
+        description: "The checksum of the artifact"
+        value: ${{ jobs.upload.outputs.checksum }}
 
 
 permissions:
@@ -17,6 +21,8 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    outputs:
+      checksum: ${{ steps.checksum.outputs.checksum }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,6 +32,13 @@ jobs:
           cd app
           zip -r ../${{ github.event.repository.name }}.zip .
           cd ..
+
+      - name: Calculate checksum
+        id: checksum
+        run: |
+          shasum -a 256 ${{ github.event.repository.name }}.zip > checksum.txt
+          CHECKSUM=$(cut -d ' ' -f 1 checksum.txt)
+          echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

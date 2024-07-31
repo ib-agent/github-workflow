@@ -11,6 +11,10 @@ on:
         description: 'The version to deploy'
         required: true
         type: string
+      checksum:
+        description: 'The checksum of the Lambda zip file'
+        required: true
+        type: string
 
 permissions:
   id-token: write
@@ -67,6 +71,7 @@ jobs:
           TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_lambda_version: ${{ inputs.version }}
+          TF_VAR_lambda_checksum: ${{ inputs.checksum }}
 
       - name: Terraform Apply
         if: steps.plan.outputs.exitcode == '2'
@@ -80,4 +85,5 @@ jobs:
           TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_lambda_version: ${{ inputs.version }}
+          TF_VAR_lambda_checksum: ${{ inputs.checksum }}
 
