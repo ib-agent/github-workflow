@@ -1,0 +1,43 @@
+name: Deploy Lambda
+
+on:
+  workflow_call:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          cd app
+          pip install -r requirements.txt
+          cd ../tests
+          pip install -r requirements_test.txt
+
+      - name: Run tests
+        run: |
+          cd tests/unit
+          pytest
+
+      - name: Run tests with coverage
+        run: |
+          cd tests/unit
+          coverage run --rcfile=.coveragerc -m pytest
+
+      - name: Enforce Coverage Threshold
+        run: |
+          cd tests/unit
+          coverage report --rcfile=.coveragerc
