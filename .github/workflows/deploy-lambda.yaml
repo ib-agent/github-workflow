@@ -65,8 +65,8 @@ jobs:
           CHECKSUM=$(cut -d ' ' -f 1 checksum.txt)
           echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
 
-      - name: Set default artifact name if not provided
-        id: set_artifact_name
+      - name: Set role if not provided
+        id: set_role
         run: |
           if [ -z "${{ inputs.role_to_assume }}" ]; then
             echo "role_to_assume=${{ vars.ROLE_TO_ASSUME }}" >> "$GITHUB_ENV"
