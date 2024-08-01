@@ -7,6 +7,11 @@ on:
         description: 'The environment to test'
         required: true
         type: string
+      working_dir:
+        description: 'The directory of the Lambda function'
+        required: false
+        default: '.'
+        type: string
 
 permissions:
   id-token: write
@@ -16,6 +21,10 @@ jobs:
   post-deployment-tests:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working_dir }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

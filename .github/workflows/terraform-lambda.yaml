@@ -15,6 +15,11 @@ on:
         description: 'The checksum of the Lambda zip file'
         required: true
         type: string
+      working_dir:
+        description: 'The directory of the Lambda function'
+        required: false
+        default: '.'
+        type: string
 
 permissions:
   id-token: write
@@ -27,7 +32,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: ./tf
+        working-directory: ${{ inputs.working_dir }}/tf
 
     steps:
       - name: Checkout repository

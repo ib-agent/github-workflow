@@ -7,6 +7,11 @@ on:
         description: 'The environment to deploy to'
         required: true
         type: string
+      working_dir:
+        description: 'The directory of the Lambda function'
+        required: false
+        default: '.'
+        type: string
     outputs:
       checksum:
         description: "The checksum of the artifact"
@@ -21,6 +26,10 @@ jobs:
   upload:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working_dir }}
     outputs:
       checksum: ${{ steps.checksum.outputs.checksum }}
     steps:
