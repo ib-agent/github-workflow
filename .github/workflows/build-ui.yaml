@@ -83,7 +83,7 @@ jobs:
           REACT_APP_VERSION: ${{ inputs.version }}
           REACT_APP_ENV: ${{ inputs.environment }}
           REACT_APP_SERVICE_NAME: ${{ inputs.react_app_service_name }}
-        run: yarn build:${{ inputs.environment }}
+        run: yarn build
 
       - name: Zip distribution contents
         run: |
