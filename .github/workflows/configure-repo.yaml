@@ -109,4 +109,4 @@ jobs:
           echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
           gh variable set AWS_ACCOUNT_ID --repo ${{ github.repository }} --env=production --body="${{ inputs.aws_account_id_prod }}"
           gh variable set AWS_REGION --repo ${{ github.repository }} --env=production --body="${{ inputs.aws_region_prod }}"
-          gh variable
+          gh variable set REACT_APP_DD_SITE --repo ${{ github.repository }} --env=production --body="${{ inputs.datadog_dd_site_prod }}"
