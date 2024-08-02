@@ -55,13 +55,13 @@ jobs:
       - name: Zip Lambda function
         run: |
           cd app
-          zip -r ../${{ step.set_artifact_name.outputs.artifact_name }}.zip .
+          zip -r ../${{ steps.set_artifact_name.outputs.artifact_name }}.zip .
           cd ..
 
       - name: Calculate checksum
         id: checksum
         run: |
-          shasum -a 256 ${{ step.set_artifact_name.outputs.artifact_name }}.zip > checksum.txt
+          shasum -a 256 ${{ steps.set_artifact_name.outputs.artifact_name }}.zip > checksum.txt
           CHECKSUM=$(cut -d ' ' -f 1 checksum.txt)
           echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
 
@@ -77,9 +77,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ step.set_role.outputs.role }}
+          role-to-assume: ${{ steps.set_role.outputs.role }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Upload Lambda zip to S3
         run: |
-          aws s3 cp $ARTIFACT.zip s3://${{ vars.LAMBDA_BUCKET_PREFIX}}-${{ vars.AWS_ACCOUNT_ID}}/${{ step.set_artifact_name.outputs.artifact_name }}/${{ step.set_artifact_name.outputs.artifact_name }}.zip
+          aws s3 cp $ARTIFACT.zip s3://${{ vars.LAMBDA_BUCKET_PREFIX}}-${{ vars.AWS_ACCOUNT_ID}}/${{ steps.set_artifact_name.outputs.artifact_name }}/${{ steps.set_artifact_name.outputs.artifact_name }}.zip
