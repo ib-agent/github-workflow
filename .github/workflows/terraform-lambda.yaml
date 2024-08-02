@@ -47,9 +47,9 @@ jobs:
         id: set_role
         run: |
           if [ -z "${{ inputs.role_to_assume }}" ]; then
-            echo "role=${{ vars.ROLE_TO_ASSUME }}" >> $GITHUB_OUTPUT
+            echo "role=${{ vars.ROLE_TO_ASSUME }}" >> "$GITHUB_OUTPUT"
           else
-            echo "role=${{ inputs.role_to_assume }}" >> $GITHUB_OUTPUT
+            echo "role=${{ inputs.role_to_assume }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Configure AWS credentials
