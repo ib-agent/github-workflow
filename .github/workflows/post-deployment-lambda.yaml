@@ -50,15 +50,15 @@ jobs:
         id: set_role
         run: |
           if [ -z "${{ inputs.role_to_assume }}" ]; then
-            echo "ROLE=${{ vars.ROLE_TO_ASSUME }}" >> "$GITHUB_ENV"
+            echo "role=${{ vars.ROLE_TO_ASSUME }}" >> $GITHUB_OUTPUT
           else
-            echo "ROLE=${{ inputs.role_to_assume }}" >> "$GITHUB_ENV"
+            echo "role=${{ inputs.role_to_assume }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.ROLE }}
+          role-to-assume: ${{ steps.set_role.outputs.role }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Run tests
