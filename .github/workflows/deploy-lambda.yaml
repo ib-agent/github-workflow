@@ -103,10 +103,7 @@ jobs:
 
       - name: Zip Lambda function
         run: |
-          cd app
-          pip install -r requirements.txt -t .
-          zip -r ../${{ steps.set_artifact_name.outputs.artifact_name }}.zip .
-          cd ..
+          zip -r ../${{ steps.set_artifact_name.outputs.artifact_name }}.zip app
 
       - name: Calculate checksum
         id: checksum
