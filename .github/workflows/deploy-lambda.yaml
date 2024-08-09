@@ -103,7 +103,8 @@ jobs:
 
       - name: Zip Lambda function
         run: |
-          zip -r ${{ steps.set_artifact_name.outputs.artifact_name }}.zip app
+          cd app
+          zip -r ../${{ steps.set_artifact_name.outputs.artifact_name }}.zip .
 
       - name: Calculate checksum
         id: checksum
