@@ -29,7 +29,56 @@ permissions:
   contents: read
 
 jobs:
+
+  layer:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working_dir }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set artifact name based on working directory
+        id: set_artifact_name
+        run: |
+          if [ "${{ inputs.working_dir }}" = "." ]; then
+            echo "artifact_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+          else
+            ARTIFACT_NAME=$(basename ${{ inputs.working_dir }})
+            echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for requirements.txt and install dependencies
+        run: |
+          if [ -f "requirements.txt" ]; then
+            TEMP_DIR=$(mktemp -d)
+            mkdir -p $TEMP_DIR/python
+            pip3 install --platform manylinux2014_x86_64 \
+                         --implementation cp \
+                         --python-version 3.12 \
+                         --only-binary=:all: \
+                         -r requirements.txt -t $TEMP_DIR/python
+
+            cd $TEMP_DIR
+            zip -r ../${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip .
+            cd ..
+            rm -rf $TEMP_DIR
+
+            echo "Layer created and zipped as ${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip"
+          else
+            echo "No requirements.txt found. Skipping layer creation."
+          fi
+      - name: Upload Lambda layer zip to S3 (if created)
+        if: success() && steps.check_requirements.outputs.layer_created == 'true'
+        run: |
+          aws s3 cp ${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip s3://${{ vars.LAMBDA_BUCKET_PREFIX}}-${{ vars.AWS_ACCOUNT_ID}}/${{ steps.set_artifact_name.outputs.artifact_name }}/${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip
+
   upload:
+    needs:
+      - layer
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     defaults:
