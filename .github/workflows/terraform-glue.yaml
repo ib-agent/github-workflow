@@ -95,7 +95,6 @@ jobs:
         if: steps.plan.outputs.exitcode == '2'
         run: terraform apply -auto-approve plan.tfplan
         env:
-        env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           TF_VAR_project_name: ${{ steps.set_artifact_name.outputs.artifact_name }}
           TF_VAR_datadog_api_key_secret_arn: ${{ vars.DD_API_KEY_SECRET_ARN }}
