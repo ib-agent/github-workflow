@@ -1,0 +1,105 @@
+name: Terraform
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'The environment to build'
+        required: true
+        type: string
+      working_dir:
+        description: 'The directory of the Lambda function'
+        required: false
+        default: '.'
+        type: string
+      role_to_assume:
+        description: 'the aws role to assume'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_dir }}/tf
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set role if not provided
+        id: set_role
+        run: |
+          if [ -z "${{ inputs.role_to_assume }}" ]; then
+            echo "role=${{ vars.ROLE_TO_ASSUME }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "role=${{ inputs.role_to_assume }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.set_role.outputs.role }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Debug AWS credentials configuration
+        run: |
+          aws sts get-caller-identity
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+
+      - name: Set up GitHub authentication for Terraform modules
+        run: |
+          git config --global url."https://$GITHUB_TOKEN:@github.com/".insteadOf "https://github.com/"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Terraform Init
+        run: ./terraform-init.sh ${{ vars.AWS_ACCOUNT_ID }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Set artifact name based on working directory
+        id: set_artifact_name
+        run: |
+          if [ "${{ inputs.working_dir }}" = "." ]; then
+            echo "artifact_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+          else
+            ARTIFACT_NAME=$(basename ${{ inputs.working_dir }})
+            echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -detailed-exitcode -out=plan.tfplan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          TF_VAR_project_name: ${{ steps.set_artifact_name.outputs.artifact_name }}
+          TF_VAR_datadog_api_key_secret_arn: ${{ vars.DD_API_KEY_SECRET_ARN }}
+          TF_VAR_datadog_site: ${{ vars.DD_SITE }}
+          TF_VAR_region: ${{ vars.AWS_REGION }}
+          TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+
+      - name: Terraform Apply
+        if: steps.plan.outputs.exitcode == '2'
+        run: terraform apply -auto-approve plan.tfplan
+        env:
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          TF_VAR_project_name: ${{ steps.set_artifact_name.outputs.artifact_name }}
+          TF_VAR_datadog_api_key_secret_arn: ${{ vars.DD_API_KEY_SECRET_ARN }}
+          TF_VAR_datadog_site: ${{ vars.DD_SITE }}
+          TF_VAR_region: ${{ vars.AWS_REGION }}
+          TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+
