@@ -43,6 +43,14 @@ on:
         description: 'The environment to build for'
         required: true
         type: string
+      user_pool_id:
+        description: 'Cognito user pool id'
+        required: false
+        type: string
+      user_pool_client_id:
+        description: 'Cognito user pool client id'
+        required: false
+        type: string
 
 permissions:
   id-token: write
@@ -83,6 +91,8 @@ jobs:
           REACT_APP_VERSION: ${{ inputs.version }}
           REACT_APP_ENV: ${{ inputs.environment }}
           REACT_APP_SERVICE_NAME: ${{ inputs.react_app_service_name }}
+          REACT_APP_COGNITO_IDENTITY_POOL_ID: ${{ inputs.user_pool_id }}
+          REACT_APP_COGNITO_APP_CLIENT_ID: ${{ inputs.user_pool_client_id }}
         run: yarn build
 
       - name: Zip distribution contents
