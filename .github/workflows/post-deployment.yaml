@@ -71,7 +71,7 @@ jobs:
 
       - name: Retrieve Cognito Token
         run: |
-          TOKEN=./tests/getToken.sh
+          TOKEN=$(./tests/getToken.sh)
           echo "TOKEN=$TOKEN" >> $GITHUB_ENV
 
       - name: Run Postman tests
