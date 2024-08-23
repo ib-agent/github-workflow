@@ -69,11 +69,12 @@ jobs:
 
       - name: Retrieve Cognito Token
         run: |
-          ./tests/getToken.sh
+          TOKEN=./tests/getToken.sh
+          echo "TOKEN=$TOKEN" >> $GITHUB_ENV
 
       - name: Run Postman tests
         run: |
           newman run tests/postman/${{ inputs.project_name }}.postman_collection.json \
           -e tests/postman/${{ inputs.environment }}.postman_environment.json \
-          --header "Authorization: Bearer $BEARER_TOKEN" \
+          --env-var "bearer_token=${{ env.TOKEN }}" \
           --bail
