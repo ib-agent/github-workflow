@@ -61,7 +61,14 @@ jobs:
       - name: Install Newman
         run: npm install -g newman
 
+      - name: Retrieve Cognito Token
+        run: |
+          ./tests/getToken.sh
+
+
       - name: Run Postman tests
         run: |
           newman run tests/postman/${{ inputs.project_name }}.postman_collection.json \
-          -e tests/postman/${{ inputs.environment }}.postman_environment.json --bail
+          -e tests/postman/${{ inputs.environment }}.postman_environment.json \
+          --header "Authorization: Bearer $BEARER_TOKEN" \
+          --bail
