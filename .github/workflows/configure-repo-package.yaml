@@ -1,0 +1,70 @@
+name: Configure Repository
+
+on:
+  workflow_call:
+    inputs:
+      aws_account_id_dev:
+        description: 'AWS Account ID for development'
+        required: true
+        type: string
+
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install GitHub CLI
+        run: sudo apt-get install -y gh
+
+      - name: Authenticate GitHub CLI
+        run: echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Branch Protection Rules
+        run: |
+          gh api --method PUT repos/${{ github.repository }}/branches/main/protection --input - <<EOF
+          {
+           "enforce_admins": true,
+           "required_pull_request_reviews": {
+             "dismiss_stale_reviews": true,
+             "require_code_owner_reviews": false,
+             "required_approving_review_count": 1
+           },
+           "restrictions": null,
+           "allow_force_pushes": false,
+           "allow_deletions": false,
+           "required_conversation_resolution": true,
+           "required_linear_history": false,
+           "required_signatures": false,
+           "lock_branch": false
+          }
+          EOF
+
+      - name: Configure Merge Options
+        run: |
+          gh api --method PATCH repos/${{ github.repository }} --input - <<EOF
+          {
+            "allow_squash_merge": true,
+            "allow_merge_commit": false,
+            "allow_rebase_merge": false,
+            "squash_merge_commit_title": "PR_TITLE",
+            "squash_merge_commit_message": "PR_BODY"
+          }
+          EOF
+
+      - name: Enable Branch Deletion After Merging
+        run: gh api -X PATCH repos/${{ github.repository }} -F delete_branch_on_merge=true
+
+      - name: Always Suggest Updating Pull Request Branches
+        run: gh api -X PATCH repos/${{ github.repository }} -F allow_auto_merge=true
+
+      - name: Create Environment for Development
+        run: |
+          gh api --method PUT -H "Accept: application/vnd.github+json" repos/${{ github.repository }}/environments/development
+
+      - name: Set Environment Variables for Development
+        run: |
+          echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
+          gh variable set AWS_ACCOUNT_ID --repo ${{ github.repository }} --env=development --body="${{ inputs.aws_account_id_dev }}"
+          gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=development --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_dev }}:role/${{ github.event.inputs.project_name }}-GitHubActionsRole"
