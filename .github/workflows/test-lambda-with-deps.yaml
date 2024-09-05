@@ -60,9 +60,9 @@ jobs:
         env:
           CODEARTIFACT_URL: ${{ env.CODEARTIFACT_URL }}
         run: |
-          pip install --extra-index-url $CODEARTIFACT_URL -r requirements.txt
+          pip install --index-url https://pypi.org/simple --extra-index-url $CODEARTIFACT_URL -r requirements.txt
           cd tests
-          pip install --extra-index-url $CODEARTIFACT_URL -r requirements_test.txt
+          pip install --index-url https://pypi.org/simple --extra-index-url $CODEARTIFACT_URL -r requirements_test.txt
 
       - name: Run tests
         run: |
