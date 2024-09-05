@@ -51,18 +51,13 @@ jobs:
         run: |
           aws codeartifact login --tool pip --domain cabernetai --repository python
 
-      - name: Set up CodeArtifact URL
-        run: |
-          codeartifact_url=$(aws codeartifact get-repository-endpoint --domain cabernetai --repository python --format pypi --query repositoryEndpoint --output text)
-          echo "CODEARTIFACT_URL=$codeartifact_url" >> $GITHUB_ENV
-
       - name: Install dependencies
         env:
           CODEARTIFACT_URL: ${{ env.CODEARTIFACT_URL }}
         run: |
-          pip install --index-url https://pypi.org/simple --extra-index-url $CODEARTIFACT_URL -r requirements.txt
+          pip install -r requirements.txt
           cd tests
-          pip install --index-url https://pypi.org/simple --extra-index-url $CODEARTIFACT_URL -r requirements_test.txt
+          pip install -r requirements_test.txt
 
       - name: Run tests
         run: |
