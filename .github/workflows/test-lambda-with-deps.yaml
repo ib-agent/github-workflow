@@ -1,0 +1,68 @@
+name: Deploy Lambda
+
+on:
+  workflow_call:
+    inputs:
+      working_dir:
+        description: 'The directory of the Lambda function'
+        required: false
+        default: '.'
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working_dir }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Authenticate to AWS CodeArtifact
+        run: aws codeartifact login --tool pip --domain cabernetai --repository python
+
+      - name: Set up CodeArtifact URL
+        run: |
+          codeartifact_url=$(aws codeartifact get-repository-endpoint --domain cabernetai --repository python --format pypi --query repositoryEndpoint --output text)
+          echo "CODEARTIFACT_URL=$codeartifact_url" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        env:
+          CODEARTIFACT_URL: ${{ env.CODEARTIFACT_URL }}
+        run: |
+          pip install --extra-index-url $CODEARTIFACT_URL -r requirements.txt
+          cd tests
+          pip install --extra-index-url $CODEARTIFACT_URL -r requirements_test.txt
+
+      - name: Run tests
+        run: |
+          cd tests/unit
+          pytest
+
+      - name: Run tests with coverage
+        run: |
+          cd tests/unit
+          coverage run --rcfile=.coveragerc -m pytest
+
+      - name: Enforce Coverage Threshold
+        run: |
+          cd tests/unit
+          coverage report --rcfile=.coveragerc
