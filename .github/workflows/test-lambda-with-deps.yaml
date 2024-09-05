@@ -8,6 +8,10 @@ on:
         required: false
         default: '.'
         type: string
+      environment:
+        description: 'The GH environment development or production'
+        required: true
+        type: string
 
 permissions:
   id-token: write
