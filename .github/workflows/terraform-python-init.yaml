@@ -68,7 +68,9 @@ jobs:
           
 
       - name: Terraform Init
-        run: ./terraform-init.sh ${{ inputs.aws_account_id }}
+        run: |
+          ./terraform-init.sh ${{ inputs.aws_account_id }}
+          sleep 20
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
