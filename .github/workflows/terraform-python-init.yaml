@@ -62,7 +62,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Create Terraform Base
-        run: ./create_tf_base.sh ${{ inputs.aws_account_id }}
+        run: |
+          echo ${{ inputs.aws_account_id }}
+          ./create_tf_base.sh ${{ inputs.aws_account_id }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           
@@ -119,7 +121,9 @@ jobs:
           terraform_version: 1.5.7
           
       - name: Create Terraform Base
-        run: ./create_tf_base.sh ${{ inputs.aws_account_id }}
+        run: |
+          echo ${{ inputs.aws_account_id }}
+          ./create_tf_base.sh ${{ inputs.aws_account_id }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
