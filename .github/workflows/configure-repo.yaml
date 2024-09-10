@@ -103,6 +103,8 @@ jobs:
           gh variable set AWS_ACCOUNT_ID --repo ${{ github.repository }} --env=development --body="${{ inputs.aws_account_id_dev }}"
           gh variable set AWS_REGION --repo ${{ github.repository }} --env=development --body="${{ inputs.aws_region_dev }}"
           gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=development --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_dev }}:role/${{ github.event.inputs.project_name }}-GitHubActionsRole"
+          gh variable set TF_INIT_ROLE_TO_ASSUME --repo ${{ github.repository }} --env=development --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_dev }}:role/TF-Init-GitHubActionsRole"
+
 
       - name: Set Environment Variables for Production
         run: |
@@ -110,3 +112,5 @@ jobs:
           gh variable set AWS_ACCOUNT_ID --repo ${{ github.repository }} --env=production --body="${{ inputs.aws_account_id_prod }}"
           gh variable set AWS_REGION --repo ${{ github.repository }} --env=production --body="${{ inputs.aws_region_prod }}"
           gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=production --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_prod }}:role/${{ github.event.inputs.project_name }}-GitHubActionsRole"
+          gh variable set TF_INIT_ROLE_TO_ASSUME --repo ${{ github.repository }} --env=production --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_prod }}:role/TF-Init-GitHubActionsRole"
+
