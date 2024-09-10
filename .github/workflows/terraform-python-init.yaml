@@ -1,0 +1,129 @@
+name: Terraform
+
+on:
+  workflow_call:
+    inputs:
+      project_name:
+        description: 'The GitHub repository name'
+        required: true
+        type: string
+      aws_account_id:
+        description: 'The AWS account id'
+        required: true
+        type: string
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      role_to_assume:
+        description: 'AWS Role to Assume'
+        required: true
+        type: string
+      environment:
+        description: 'environment, used in dd tags'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform_base:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./tf/base
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.role_to_assume }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Debug AWS credentials configuration
+        run: |
+          aws sts get-caller-identity
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+
+      - name: Set up GitHub authentication for Terraform modules
+        run: |
+          git config --global url."https://$GITHUB_TOKEN:@github.com/".insteadOf "https://github.com/"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Create Terraform Base
+        run: ./create_tf_base.sh ${{ inputs.aws_account_id }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          
+
+      - name: Terraform Init
+        run: ./terraform-init.sh ${{ inputs.aws_account_id }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -detailed-exitcode -out=plan.tfplan
+        env:
+          TF_VAR_region: ${{ inputs.aws_region }}
+          TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
+          TF_VAR_project_name: ${{ inputs.project_name }}
+          TF_VAR_environment: ${{ inputs.environment }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Terraform Apply
+        if: steps.plan.outputs.exitcode == '2'
+        run: terraform apply -auto-approve plan.tfplan
+        env:
+          TF_VAR_region: ${{ inputs.aws_region }}
+          TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
+          TF_VAR_project_name: ${{ inputs.project_name }}
+          TF_VAR_environment: ${{ inputs.environment }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  terraform_main:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./tf/main
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.role_to_assume }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Debug AWS credentials configuration
+        run: |
+          aws sts get-caller-identity
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+          
+      - name: Create Terraform Base
+        run: ./create_tf_base.sh ${{ inputs.aws_account_id }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Terraform Init
+        run: ./terraform-init.sh ${{ inputs.aws_account_id }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
