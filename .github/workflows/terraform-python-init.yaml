@@ -42,7 +42,7 @@ jobs:
       - name: Set env
         id: set_env
         run: |
-          echo "[INFO] Environment: ${{ matrix.development }}"
+          echo "[INFO] Environment: ${{ matrix.environment }}"
           if ["${{ matrix.environment }}" == "development" ]; then
             echo "aws_account_id=${{ inputs.aws_account_id_dev }}" >> "$GITHUB_OUTPUT"
             echo "aws_region=${{ inputs.aws_region_dev }}" >> "$GITHUB_OUTPUT"
