@@ -160,6 +160,7 @@ jobs:
 
       - name: Terraform Apply
         if: steps.plan.outputs.exitcode == '2'
+        working-directory: ./terraform-modules/python-service-base
         run: terraform apply -auto-approve plan.tfplan
         env:
           TF_VAR_region: ${{ steps.set_env.outputs.aws_region }}
