@@ -46,12 +46,12 @@ jobs:
           if ["${{ matrix.environment }}" == "development" ]; then
             echo "aws_account_id=${{ inputs.aws_account_id_dev }}" >> "$GITHUB_OUTPUT"
             echo "aws_region=${{ inputs.aws_region_dev }}" >> "$GITHUB_OUTPUT"
-            role_to_assume="arn:aws:iam::${{ inputs.aws_account_id_dev }}:role/${{ role_to_assume }}"
+            role_to_assume="arn:aws:iam::${{ inputs.aws_account_id_dev }}:role/${{ inputs.role_to_assume }}"
             echo "role_to_assume=$role_to_assume" >> "$GITHUB_OUTPUT"
           else
             echo "aws_region=${{ inputs.aws_region_prod }}" >> "$GITHUB_OUTPUT"
             echo "aws_account_id=${{ inputs.aws_account_id_prod }}" >> "$GITHUB_OUTPUT"
-            role_to_assume="arn:aws:iam::${{ inputs.aws_account_id_prod }}:role/${{ role_to_assume }}"
+            role_to_assume="arn:aws:iam::${{ inputs.aws_account_id_prod }}:role/${{ inputs.role_to_assume }}"
             echo "role_to_assume=$role_to_assume" >> "$GITHUB_OUTPUT"
           fi
 
