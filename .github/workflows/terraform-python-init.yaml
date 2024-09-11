@@ -43,7 +43,7 @@ jobs:
         id: set_env
         run: |
           echo "[INFO] Environment: ${{ matrix.environment }}"
-          if ["${{ matrix.environment }}" == "development" ]; then
+          if [ "${{ matrix.environment }}" == "development" ]; then
             echo "aws_account_id=${{ inputs.aws_account_id_dev }}" >> "$GITHUB_OUTPUT"
             echo "aws_region=${{ inputs.aws_region_dev }}" >> "$GITHUB_OUTPUT"
             role_to_assume="arn:aws:iam::${{ inputs.aws_account_id_dev }}:role/${{ inputs.role_to_assume }}"
