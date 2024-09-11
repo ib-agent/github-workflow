@@ -54,6 +54,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up GitHub authentication for Terraform modules
+        run: |
+          git config --global url."https://$GITHUB_TOKEN:@github.com/".insteadOf "https://github.com/"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
       - name: Checkout Terraform Modules Repository
         uses: actions/checkout@v3
         with:
@@ -118,12 +124,6 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.7
-
-      - name: Set up GitHub authentication for Terraform modules
-        run: |
-          git config --global url."https://$GITHUB_TOKEN:@github.com/".insteadOf "https://github.com/"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Init
         working-directory: ./terraform-modules/python-service-base 
