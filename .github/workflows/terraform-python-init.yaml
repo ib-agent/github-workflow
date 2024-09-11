@@ -7,48 +7,82 @@ on:
         description: 'The GitHub repository name'
         required: true
         type: string
-      aws_account_id:
+      aws_account_id_dev:
         description: 'The AWS account id'
         required: true
         type: string
-      aws_region:
-        description: 'AWS Region'
+      aws_account_id_prod:
+        description: 'The AWS account id'
+        required: true
+        type: string
+      aws_region_dev:
+        description: 'DEV AWS Region'
+        required: true
+        type: string
+      aws_region_prod:
+        description: 'PROD AWS Region'
         required: true
         type: string
       role_to_assume:
-        description: 'AWS Role to Assume'
+        description: 'TF Init Dev Role to Assume'
         required: true
-        type: string
-      environment:
-        description: 'environment, used in dd tags'
-        required: true
-        type: string
-
+        default: 'Python-TF-Init-GitHubActionsRole' 
+      #
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  terraform_base:
+  terraform_init:
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: ./tf/base
-
+    strategy:
+      matrix:
+        environment: [development, production]
     steps:
+      - name: Set env
+        id: set_env
+        run: |
+          echo "[INFO] Environment: ${{ matrix.development }}"
+          if ["${{ matrix.environment }}" == "development" ]; then
+            echo "aws_account_id=${{ inputs.aws_account_id_dev }}" >> "$GITHUB_OUTPUT"
+            echo "aws_region=${{ inputs.aws_region_dev }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "aws_region=${{ inputs.aws_region_prod }}" >> "$GITHUB_OUTPUT"
+            echo "aws_account_id=${{ inputs.aws_account_id_prod }}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Checkout Terraform Modules Repository
+        uses: actions/checkout@v3
+        with:
+          repository: ib-agent/terraform-modules
+          path: terraform-modules
+          ref: KAN-114-auto-tf-init
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ inputs.role_to_assume }}
-          aws-region: ${{ inputs.aws_region }}
+          aws-region: ${{ steps.set_env.outputs.aws_region }}
 
       - name: Debug AWS credentials configuration
         run: |
           aws sts get-caller-identity
+
+      - name: Check & create DynamoDB Table if not existed
+        run: |
+          table_name="${{ inputs.project_name }}-lock-table" 
+          echo "[INFO] Create Locking State DynamoDB Table for service: $table_name"
+          if aws dynamodb describe-table --table-name $table_name 2>/dev/null; then
+            echo "DynamoDB table $table_name already exists."
+          else
+            echo "Creating DynamoDB table: $table_name"
+            aws dynamodb create-table --table-name $table_name \
+              --attribute-definitions AttributeName=LockID,AttributeType=S \
+              --key-schema AttributeName=LockID,KeyType=HASH \
+              --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+          fi
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
@@ -61,71 +95,31 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Create Terraform Base
-        run: ./create_tf_base.sh ${{ inputs.aws_account_id }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          
-
       - name: Terraform Init
+        working-directory: ./terraform-modules/python-service-base 
         run: |
-          ./terraform-init.sh ${{ inputs.aws_account_id }}
+          ./terraform-init.sh ${{ steps.set_env.outputs.aws_account_id }}
           sleep 20
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Plan
         id: plan
+        working-directory: ./terraform-modules/python-service-base 
         run: terraform plan -detailed-exitcode -out=plan.tfplan
         env:
-          TF_VAR_region: ${{ inputs.aws_region }}
-          TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
+          TF_VAR_region: ${{ steps.set_env.outputs.aws_region }}
+          TF_VAR_aws_account_id: ${{ steps.set_env.outputs.aws_account_id }}
           TF_VAR_project_name: ${{ inputs.project_name }}
-          TF_VAR_environment: ${{ inputs.environment }}
+          TF_VAR_environment: ${{ matrix.environment }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Apply
         if: steps.plan.outputs.exitcode == '2'
         run: terraform apply -auto-approve plan.tfplan
         env:
-          TF_VAR_region: ${{ inputs.aws_region }}
-          TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
+          TF_VAR_region: ${{ steps.set_env.outputs.aws_region }}
+          TF_VAR_aws_account_id: ${{ steps.set_env.outputs.aws_account_id }}
           TF_VAR_project_name: ${{ inputs.project_name }}
-          TF_VAR_environment: ${{ inputs.environment }}
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-
-  terraform_main:
-    runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: ./tf/main
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ inputs.role_to_assume }}
-          aws-region: ${{ inputs.aws_region }}
-
-      - name: Debug AWS credentials configuration
-        run: |
-          aws sts get-caller-identity
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.7
-          
-      - name: Create Terraform Base
-        run: ./create_tf_base.sh ${{ inputs.aws_account_id }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Terraform Init
-        run: ./terraform-init.sh ${{ inputs.aws_account_id }}
-        env:
+          TF_VAR_environment: ${{ matrix.environment }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
