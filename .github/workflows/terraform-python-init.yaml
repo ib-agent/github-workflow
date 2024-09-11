@@ -27,7 +27,7 @@ on:
         description: 'TF Init Dev Role to Assume'
         required: true
         default: 'Python-TF-Init-GitHubActionsRole' 
-      #
+
 permissions:
   id-token: write
   contents: read
@@ -70,15 +70,44 @@ jobs:
         run: |
           aws sts get-caller-identity
 
-      - name: Check & create DynamoDB Table if not existed
+      - name: Check S3 State Bucket exist
+        env:
+          AWS_ACCOUNT_ID: ${{ steps.set_env.outputs.aws_account_id }}
         run: |
-          table_name="${{ inputs.project_name }}-lock-table" 
-          echo "[INFO] Create Locking State DynamoDB Table for service: $table_name"
-          if aws dynamodb describe-table --table-name $table_name 2>/dev/null; then
-            echo "DynamoDB table $table_name already exists."
+          state_bucket_name="cabernet-ai-$AWS_ACCOUNT_ID-state-bucket"
+          # Check if the bucket exists
+          if aws s3api head-bucket --bucket $state_bucket_name 2>/dev/null; then
+            echo "[INFO] State bucket exists on aws account: $AWS_ACCOUNT_ID"
           else
-            echo "Creating DynamoDB table: $table_name"
-            aws dynamodb create-table --table-name $table_name \
+            echo "[ERROR] State bucket does not exist on aws account: $AWS_ACCOUNT_ID"
+            exit 1
+          fi
+
+      - name: Check & create DynamoDB Table if not existed
+        env:
+          PROJECT_NAME: ${{ inputs.project_name }} 
+        run: |
+          # Base Lock State DynamoDB Table
+          base_table_name="$PROJECT_NAME-base-lock-table" 
+          echo "[INFO] Create Base Locking State DynamoDB Table for service: $PROJECT_NAME"
+          if aws dynamodb describe-table --table-name $base_table_name 2>/dev/null; then
+            echo "DynamoDB table $base_table_name already exists."
+          else
+            echo "Creating DynamoDB table: $base_table_name"
+            aws dynamodb create-table --table-name $base_table_name \
+              --attribute-definitions AttributeName=LockID,AttributeType=S \
+              --key-schema AttributeName=LockID,KeyType=HASH \
+              --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+          fi
+          
+          # Main Lock State DynamoDB Table
+          main_table_name="$PROJECT_NAME-main-lock-table" 
+          echo "[INFO] Create Base Locking State DynamoDB Table for service: $PROJECT_NAME"
+          if aws dynamodb describe-table --table-name $main_table_name 2>/dev/null; then
+            echo "DynamoDB table $main_table_name already exists."
+          else
+            echo "Creating DynamoDB table: $main_table_name"
+            aws dynamodb create-table --table-name $main_table_name \
               --attribute-definitions AttributeName=LockID,AttributeType=S \
               --key-schema AttributeName=LockID,KeyType=HASH \
               --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
@@ -98,10 +127,11 @@ jobs:
       - name: Terraform Init
         working-directory: ./terraform-modules/python-service-base 
         run: |
-          ./terraform-init.sh ${{ steps.set_env.outputs.aws_account_id }}
+          ./terraform-init.sh $AWS_ACCOUNT_ID 
           sleep 20
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          AWS_ACCOUNT_ID: ${{ steps.set_env.outputs.aws_account_id }}
 
       - name: Terraform Plan
         id: plan
