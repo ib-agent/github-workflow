@@ -26,6 +26,7 @@ on:
       role_to_assume:
         description: 'TF Init Dev Role to Assume'
         required: true
+        type: string
         default: 'Python-TF-Init-GitHubActionsRole' 
 
 permissions:
