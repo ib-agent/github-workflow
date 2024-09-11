@@ -49,6 +49,7 @@ jobs:
           else
             echo "aws_region=${{ inputs.aws_region_prod }}" >> "$GITHUB_OUTPUT"
             echo "aws_account_id=${{ inputs.aws_account_id_prod }}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Checkout repository
         uses: actions/checkout@v4
