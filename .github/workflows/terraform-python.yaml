@@ -43,14 +43,17 @@ permissions:
 jobs:
   terraform:
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: ./tf/main
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Checkout Terraform Modules Repository
+        uses: actions/checkout@v3
+        with:
+          repository: ib-agent/terraform-modules
+          path: terraform-modules
+          ref: KAN-114-auto-tf-init
+          token: ${{ secrets.GH_TOKEN }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -72,6 +75,14 @@ jobs:
           git config --global url."https://$GITHUB_TOKEN:@github.com/".insteadOf "https://github.com/"
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Replace template with project name 
+        working-directory: ./terraform-modules/python-service-main 
+        run: |
+          # Find all files and replace {{ cookiecutter.project_name }} with $PROJECT_NAME
+          find . -type f -exec sed -i "s/{{ cookiecutter\.project_name }}/$PROJECT_NAME/g" {} +
+        env:
+          PROJECT_NAME: ${{ inputs.project_name }}
 
       - name: Terraform Init
         run: ./terraform-init.sh ${{ inputs.aws_account_id }}

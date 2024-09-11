@@ -130,6 +130,14 @@ jobs:
         with:
           terraform_version: 1.5.7
 
+      - name: Replace template with project name 
+        working-directory: ./terraform-modules/python-service-base 
+        run: |
+          # Find all files and replace {{ cookiecutter.project_name }} with $PROJECT_NAME
+          find . -type f -exec sed -i "s/{{ cookiecutter\.project_name }}/$PROJECT_NAME/g" {} +
+        env:
+          PROJECT_NAME: ${{ inputs.project_name }}
+
       - name: Terraform Init
         working-directory: ./terraform-modules/python-service-base 
         run: |
