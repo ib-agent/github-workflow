@@ -69,7 +69,6 @@ jobs:
         with:
           repository: ib-agent/terraform-modules
           path: terraform-modules
-          ref: KAN-114-auto-tf-init
           token: ${{ secrets.GH_TOKEN }}
 
       - name: Configure AWS credentials
