@@ -2,7 +2,12 @@ name: Test
 
 on:
   workflow_call:
-
+    inputs:
+      python_version:
+        type: string
+        description: 'Python version to use'
+        required: false
+        default: '3.12'  # Set the default to Python 3.12
 
 jobs:
   test:
@@ -14,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: ${{ inputs.python_version }}
 
       - name: Install dependencies
         run: |
