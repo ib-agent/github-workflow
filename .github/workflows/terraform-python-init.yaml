@@ -120,7 +120,7 @@ jobs:
           fi
 
       - name: Replace value for default policy files 
-        working-directory: ./tf/default-policy
+        working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
         env:
           PROJECT_NAME: ${{ inputs.project_name }}
           AWS_ACCOUNT_ID: ${{ steps.set_env.outputs.aws_account_id }} 
@@ -130,7 +130,7 @@ jobs:
           find . -type f -name "*.json" -exec sed -i 's/\${AWS_REGION}/'"$AWS_REGION"'/g; s/\${AWS_ACCOUNT_ID}/'"$AWS_ACCOUNT_ID"'/g; s/\${USER_NAME}/'"$GITHUB_REPOSITORY_OWNER"'/g; s/\${PROJECT_NAME}/'"$PROJECT_NAME"'/g' {} \;
           
       - name: Create GitHubActionsRole for project
-        working-directory: ./tf/default-policy
+        working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
         env:
           PROJECT_NAME: ${{ inputs.project_name }}
         run: |
@@ -146,7 +146,7 @@ jobs:
           fi
 
       - name: Create GitHubActionsPolicy & attatch to GitHubActionsRole 
-        working-directory: ./tf/default-policy
+        working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
         env:
           project_name: ${{ inputs.project_name }}
         run: |
@@ -164,7 +164,7 @@ jobs:
           fi
       
       - name: Create AccessPolicy & attatch to GitHubActionsRole 
-        working-directory: ./tf/default-policy
+        working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
         env:
           project_name: ${{ inputs.project_name }}
         run: |
