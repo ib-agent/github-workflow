@@ -152,7 +152,7 @@ jobs:
         run: |
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
 
-          github_policy_files=("GitHubActionsPolicy.json", "AccessPolicy.json")
+          github_policy_files=("GitHubActionsPolicy.json" "AccessPolicy.json")
 
           # Loop through each file
           for policy_file in "${github_policy_files[@]}"; do
