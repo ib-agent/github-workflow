@@ -159,7 +159,7 @@ jobs:
             echo "[INFO] File: $policy_file"
             if [[ "$policy_file" == "GitHubActionsPolicy.json" ]]; then  
               github_action_policy="$PROJECT_NAME-GitHubActionsPolicy"
-            elfi [[ "$policy_file" == "AccessPolicy.json" ]]; then  
+            elif [[ "$policy_file" == "AccessPolicy.json" ]]; then  
               github_action_policy="$PROJECT_NAME-AccessPolicy"
             else
               echo "[INFO] invalid file"
