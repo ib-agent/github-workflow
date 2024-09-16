@@ -156,12 +156,13 @@ jobs:
 
           # Loop through each file
           for policy_file in "${github_policy_files[@]}"; do
-            if [[ "$file" == "GitHubActionsPolicy.json" ]]; then  
+            echo "[INFO] File: $policy_file"
+            if [[ "$policy_file" == "GitHubActionsPolicy.json" ]]; then  
               github_action_policy="$PROJECT_NAME-GitHubActionsPolicy"
-            fi
-
-            if [[ "$file" == "AccessPolicy.json" ]]; then  
+            elfi [[ "$policy_file" == "AccessPolicy.json" ]]; then  
               github_action_policy="$PROJECT_NAME-AccessPolicy"
+            else
+              echo "[INFO] invalid file"
             fi
             
             # check if the policy exists
