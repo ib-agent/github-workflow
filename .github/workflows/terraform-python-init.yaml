@@ -108,16 +108,15 @@ jobs:
         run: |
           # ECR repository
           ecr_repository_name="$PROJECT_NAME-repo"
-          aws ecr describe-repositories --repository-names $ecr_repository_name --region $AWS_REGION
-          if [ $? -ne 0 ]; then
-          echo "[INFO] Creating repository: $ecr_repository_name"
+          if aws ecr describe-repositories --repository-names $ecr_repository_name --region $AWS_REGION 2>/dev/null; then
+            echo "[INFO] Repository $ecr_repository_name already exists."
+          else
+            echo "[INFO] Creating repository: $ecr_repository_name"
             aws ecr create-repository \
               --repository-name $ecr_repository_name \
               --image-scanning-configuration scanOnPush=true \
               --tags Key=Name,Value="cabernet_ai_app_repository" \
               --region $AWS_REGION 
-          else
-            echo "[INFO] Repository $ecr_repository_name already exists."
           fi
 
       - name: Replace value for default policy files 
@@ -137,8 +136,7 @@ jobs:
         run: |
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
           policy_file="TrustPolicy.json"
-          aws iam get-role --role-name $github_action_role > /dev/null 2>&1
-          if [ $? -eq 0 ]; then
+          if aws iam get-role --role-name $github_action_role > /dev/null 2>&1; then
             echo "[INFO] IAM role $github_action_role already exists."
           else
             echo "[INFO] Creating IAM role $github_action_role"
@@ -156,16 +154,13 @@ jobs:
           github_action_role="$project_name-GitHubActionsRole"
           policy_file="GitHubActionsPolicy.json"
           # check if the policy exists
-          aws iam list-policies --query "policies[?policyname=='$github_action_policy'].policyname" --output text | grep -q $github_action_policy
-
-          # if policy does not exist, create it
-          if [ $? -ne 0 ]; then
+          if aws iam list-policies --query "policies[?policyname=='$github_action_policy'].policyname" --output text | grep -q $github_action_policy; then
+            echo "[info] policy $github_action_policy already exists."
+          else
             echo "[info] Creating policy: $github_action_policy"
             policy_arn=$(aws iam create-policy --policy-name $github_action_policy --policy-document file://$policy_file --query "policy.arn" --output text)
             echo "[info] Attach policy $github_action_policy to role $github_action_role"
             aws iam attach-role-policy --role-name $github_action_role --policy-arn $policy_arn
-          else
-            echo "[info] policy $github_action_policy already exists."
           fi
       
       - name: Create AccessPolicy & attatch to GitHubActionsRole 
@@ -177,14 +172,11 @@ jobs:
           github_action_role="$project_name-GitHubActionsRole"
           policy_file="AccessPolicy.json"
           # check if the policy exists
-          aws iam list-policies --query "policies[?policyname=='$access_policy'].policyname" --output text | grep -q $access_policy
-
-          # if policy does not exist, create it
-          if [ $? -ne 0 ]; then
+          if aws iam list-policies --query "policies[?policyname=='$access_policy'].policyname" --output text | grep -q $access_policy; then
+            echo "[info] policy $access_policy already exists."
+          else
             echo "[info] Creating policy: $access_policy"
             policy_arn=$(aws iam create-policy --policy-name $access_policy --policy-document file://$policy_file --query "policy.arn" --output text)
             echo "[info] Attach policy $access_policy to role $github_action_role"
             aws iam attach-role-policy --role-name $github_action_role --policy-arn $policy_arn
-          else
-            echo "[info] policy $access_policy already exists."
           fi
