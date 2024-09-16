@@ -159,6 +159,7 @@ jobs:
           if [ -z "$policy_arn" ]; then
             echo "[INFO] Creating: $github_action_policy"
             aws iam create-policy --policy-name $github_action_policy --policy-document file://$policy_file
+            policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$github_action_policy'].Arn" --output text 2>/dev/null)
           else
             echo "[INFO] $github_action_policy already exists."
           fi
@@ -192,6 +193,7 @@ jobs:
           if [ -z "$policy_arn" ]; then
             echo "[INFO] Creating: $access_policy"
             aws iam create-policy --policy-name $access_policy --policy-document file://$policy_file
+            policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$access_policy'].Arn" --output text 2>/dev/null)
           else
             echo "[INFO] $access_policy already exists."
           fi
