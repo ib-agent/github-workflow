@@ -108,7 +108,7 @@ jobs:
         run: |
           # ECR repository
           ecr_repository_name="$PROJECT_NAME-repo"
-          aws ecr describe-repositories --repository-names $ecr_repository_name --region $AWS_REGION 2>/dev/null
+          aws ecr describe-repositories --repository-names $ecr_repository_name --region $AWS_REGION
           if [ $? -ne 0 ]; then
           echo "[INFO] Creating repository: $ecr_repository_name"
             aws ecr create-repository \
