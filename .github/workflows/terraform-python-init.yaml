@@ -85,7 +85,7 @@ jobs:
             exit 1
           fi
 
-      - name: Check & create DynamoDB Table if not existed
+      - name: Check & create DynamoDB Table
         env:
           PROJECT_NAME: ${{ inputs.project_name }} 
         run: |
@@ -101,21 +101,21 @@ jobs:
               --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
           fi
 
-      - name: Check & create ECR repository if not existed
+      - name: Check & create ECR repository
         env:
           PROJECT_NAME: ${{ inputs.project_name }}
-          REGION: ${{ steps.set_env.outputs.aws_region }}
+          AWS_REGION: ${{ steps.set_env.outputs.aws_region }}
         run: |
           # ECR repository
           ecr_repository_name="$PROJECT_NAME-repo"
-          aws ecr describe-repositories --repository-names "${REPO_NAME}" --region ${REGION} 2>/dev/null
+          aws ecr describe-repositories --repository-names $ecr_repository_name --region $AWS_REGION 2>/dev/null
           if [ $? -ne 0 ]; then
           echo "[INFO] Creating repository: $ecr_repository_name"
             aws ecr create-repository \
               --repository-name $ecr_repository_name \
               --image-scanning-configuration scanOnPush=true \
               --tags Key=Name,Value="cabernet_ai_app_repository" \
-              --region $REGION 
+              --region $AWS_REGION 
           else
             echo "[INFO] Repository $ecr_repository_name already exists."
           fi
@@ -125,11 +125,10 @@ jobs:
         env:
           PROJECT_NAME: ${{ inputs.project_name }}
           AWS_ACCOUNT_ID: ${{ steps.set_env.outputs.aws_account_id }} 
-          USER_NAME: ${{ github.event.repository.owner }}
           AWS_REGION: ${{ steps.set_env.outputs.aws_region }}
         run: |
           echo "[INFO] Replace value for default policy files"
-          find . -type f -name "*.json" -exec sed -i 's/\${AWS_REGION}/'"$AWS_REGION"'/g; s/\${AWS_ACCOUNT_ID}/'"$AWS_ACCOUNT_ID"'/g; s/\${USER_NAME}/'"$USER_NAME"'/g; s/\${PROJECT_NAME}/'"$PROJECT_NAME"'/g' {} \;
+          find . -type f -name "*.json" -exec sed -i 's/\${AWS_REGION}/'"$AWS_REGION"'/g; s/\${AWS_ACCOUNT_ID}/'"$AWS_ACCOUNT_ID"'/g; s/\${USER_NAME}/'"$GITHUB_REPOSITORY_OWNER"'/g; s/\${PROJECT_NAME}/'"$PROJECT_NAME"'/g' {} \;
           
       - name: Create GitHubActionsRole for project
         working-directory: ./tf/default-policy
