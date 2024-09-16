@@ -153,15 +153,16 @@ jobs:
           github_action_policy="$PROJECT_NAME-GitHubActionsPolicy"
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
           policy_file="GitHubActionsPolicy.json"
+
           # check if the policy exists
-          if aws iam list-policies --query "Policies[?PolicyName=='$github_action_policy'].PolicyName" --output text 2>/dev/null; then
-            echo "[INFO] $github_action_policy already exists."
-          else
+          policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$github_action_policy'].Arn" --output text 2>/dev/null)
+          if [ -z "$policy_arn" ]; then
             echo "[INFO] Creating: $github_action_policy"
             aws iam create-policy --policy-name $github_action_policy --policy-document file://$policy_file
+          else
+            echo "[INFO] $github_action_policy already exists."
           fi
 
-          policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$github_action_policy'].Arn" --output text)
           echo $policy_arn
 
           # Check if the policy is attached
@@ -185,16 +186,16 @@ jobs:
           access_policy="$PROJECT_NAME-AccessPolicy"
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
           policy_file="AccessPolicy.json"
+
           # check if the policy exists
-          if aws iam list-policies --query "Policies[?PolicyName=='$access_policy'].PolicyName" --output text 2>/dev/null; then
-            echo "[INFO] $access_policy already exists."
-          else
+          policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$access_policy'].Arn" --output text 2>/dev/null)
+          if [ -z "$policy_arn" ]; then
             echo "[INFO] Creating: $access_policy"
             aws iam create-policy --policy-name $access_policy --policy-document file://$policy_file
+          else
+            echo "[INFO] $access_policy already exists."
           fi
 
-          
-          policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$access_policy'].Arn" --output text)
           echo $policy_arn
 
           # Check if the policy is attached
