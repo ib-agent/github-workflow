@@ -154,14 +154,14 @@ jobs:
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
           policy_file="GitHubActionsPolicy.json"
           # check if the policy exists
-          if aws iam list-policies --query "policies[?policyname=='$github_action_policy'].policyname" --output text | grep -q $github_action_policy 2>/dev/null; then
-            echo "[INFO] policy $github_action_policy already exists."
+          if aws iam list-policies --query "Policies[?PolicyName=='$github_action_policy'].PolicyName" --output text 2>/dev/null; then
+            echo "[INFO] $github_action_policy already exists."
           else
-            echo "[INFO] Creating policy: $github_action_policy"
+            echo "[INFO] Creating: $github_action_policy"
             aws iam create-policy --policy-name $github_action_policy --policy-document file://$policy_file
           fi
 
-          policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$github_action_policy'].[Arn,PolicyName]" --output text)
+          policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$github_action_policy'].Arn" --output text)
 
           # Check if the policy is attached
           policy_is_attached=$(aws iam list-attached-role-policies --role-name $github_action_role \
@@ -185,15 +185,15 @@ jobs:
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
           policy_file="AccessPolicy.json"
           # check if the policy exists
-          if aws iam list-policies --query "policies[?policyname=='$access_policy'].policyname" --output text | grep -q $access_policy 2>/dev/null; then
-            echo "[info] policy $access_policy already exists."
+          if aws iam list-policies --query "Policies[?PolicyName=='$access_policy'].PolicyName" --output text 2>/dev/null; then
+            echo "[info] $access_policy already exists."
           else
-            echo "[info] Creating policy: $access_policy"
+            echo "[info] Creating: $access_policy"
             aws iam create-policy --policy-name $access_policy --policy-document file://$policy_file
           fi
 
           
-          policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$access_policy'].[Arn,PolicyName]" --output text)
+          policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$access_policy'].Arn" --output text)
 
           # Check if the policy is attached
           policy_is_attached=$(aws iam list-attached-role-policies --role-name $github_action_role \
