@@ -148,35 +148,61 @@ jobs:
       - name: Create GitHubActionsPolicy & attatch to GitHubActionsRole 
         working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
         env:
-          project_name: ${{ inputs.project_name }}
+          PROJECT_NAME: ${{ inputs.project_name }}
         run: |
-          github_action_policy="$project_name-GitHubActionsPolicy"
-          github_action_role="$project_name-GitHubActionsRole"
+          github_action_policy="$PROJECT_NAME-GitHubActionsPolicy"
+          github_action_role="$PROJECT_NAME-GitHubActionsRole"
           policy_file="GitHubActionsPolicy.json"
           # check if the policy exists
           if aws iam list-policies --query "policies[?policyname=='$github_action_policy'].policyname" --output text | grep -q $github_action_policy; then
-            echo "[info] policy $github_action_policy already exists."
+            echo "[INFO] policy $github_action_policy already exists."
           else
-            echo "[info] Creating policy: $github_action_policy"
-            policy_arn=$(aws iam create-policy --policy-name $github_action_policy --policy-document file://$policy_file --query "policy.arn" --output text)
-            echo "[info] Attach policy $github_action_policy to role $github_action_role"
-            aws iam attach-role-policy --role-name $github_action_role --policy-arn $policy_arn
+            echo "[INFO] Creating policy: $github_action_policy"
+            aws iam create-policy --policy-name $github_action_policy --policy-document file://$policy_file
           fi
+
+          policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$github_action_policy'].[Arn,PolicyName]" --output text)
+
+          # Check if the policy is attached
+          policy_is_attached=$(aws iam list-attached-role-policies --role-name $github_action_role \
+              --query "AttachedPolicies[?PolicyArn=='$policy_arn']" --output text)
+
+          # Attach the policy if not attached
+          if [ -z "$policy_is_attached" ]; then
+              echo "[INFO] Attach $github_action_policy to $github_action_role"
+              aws iam attach-role-policy --role-name $github_action_role --policy-arn $policy_arn
+          else
+              echo "[INFO] $github_action_policy is already attached in $github_action_role."
+          fi
+
       
       - name: Create AccessPolicy & attatch to GitHubActionsRole 
         working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
         env:
-          project_name: ${{ inputs.project_name }}
+          PROJECT_NAME: ${{ inputs.project_name }}
         run: |
-          access_policy="$project_name-AccessPolicy"
-          github_action_role="$project_name-GitHubActionsRole"
+          access_policy="$PROJECT_NAME-AccessPolicy"
+          github_action_role="$PROJECT_NAME-GitHubActionsRole"
           policy_file="AccessPolicy.json"
           # check if the policy exists
           if aws iam list-policies --query "policies[?policyname=='$access_policy'].policyname" --output text | grep -q $access_policy; then
             echo "[info] policy $access_policy already exists."
           else
             echo "[info] Creating policy: $access_policy"
-            policy_arn=$(aws iam create-policy --policy-name $access_policy --policy-document file://$policy_file --query "policy.arn" --output text)
-            echo "[info] Attach policy $access_policy to role $github_action_role"
-            aws iam attach-role-policy --role-name $github_action_role --policy-arn $policy_arn
+            aws iam create-policy --policy-name $access_policy --policy-document file://$policy_file
+          fi
+
+          
+          policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$access_policy'].[Arn,PolicyName]" --output text)
+
+          # Check if the policy is attached
+          policy_is_attached=$(aws iam list-attached-role-policies --role-name $github_action_role \
+              --query "AttachedPolicies[?PolicyArn=='$policy_arn']" --output text)
+
+          # Attach the policy if not attached
+          if [ -z "$policy_is_attached" ]; then
+              echo "[INFO] Attach $access_policy to $github_action_role"
+              aws iam attach-role-policy --role-name $github_action_role --policy-arn $policy_arn
+          else
+              echo "[INFO] $access_policy is already attached in $github_action_role."
           fi
