@@ -154,7 +154,7 @@ jobs:
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
           policy_file="GitHubActionsPolicy.json"
           # check if the policy exists
-          if aws iam list-policies --query "policies[?policyname=='$github_action_policy'].policyname" --output text | grep -q $github_action_policy; then
+          if aws iam list-policies --query "policies[?policyname=='$github_action_policy'].policyname" --output text | grep -q $github_action_policy 2>/dev/null; then
             echo "[INFO] policy $github_action_policy already exists."
           else
             echo "[INFO] Creating policy: $github_action_policy"
@@ -185,7 +185,7 @@ jobs:
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
           policy_file="AccessPolicy.json"
           # check if the policy exists
-          if aws iam list-policies --query "policies[?policyname=='$access_policy'].policyname" --output text | grep -q $access_policy; then
+          if aws iam list-policies --query "policies[?policyname=='$access_policy'].policyname" --output text | grep -q $access_policy 2>/dev/null; then
             echo "[info] policy $access_policy already exists."
           else
             echo "[info] Creating policy: $access_policy"
