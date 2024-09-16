@@ -142,7 +142,7 @@ jobs:
             echo "[INFO] Creating IAM role $github_action_role"
             aws iam create-role \
             --role-name $github_action_role \
-            --assume-role-policy-document file://$trust_policy_file 
+            --assume-role-policy-document file://$policy_file 
           fi
 
       - name: Create GitHubActionsPolicy & attatch to GitHubActionsRole 
