@@ -158,10 +158,11 @@ jobs:
           for policy_file in "${github_policy_files[@]}"; do
             if [[ "$file" == "GitHubActionsPolicy.json" ]]; then  
               github_action_policy="$PROJECT_NAME-GitHubActionsPolicy"
-            else
-              github_action_policy="$PROJECT_NAME-AccessPolicy"
             fi
 
+            if [[ "$file" == "AccessPolicy.json" ]]; then  
+              github_action_policy="$PROJECT_NAME-AccessPolicy"
+            fi
             
             # check if the policy exists
             policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$github_action_policy'].Arn" --output text 2>/dev/null)
