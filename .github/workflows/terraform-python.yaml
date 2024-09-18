@@ -43,11 +43,6 @@ permissions:
 jobs:
   terraform:
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: ./tf/main
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -74,11 +69,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Init
+        working-directory: ./tf
         run: ./terraform-init.sh ${{ inputs.aws_account_id }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Plan
+        working-directory: ./tf
         id: plan
         run: terraform plan -detailed-exitcode -out=plan.tfplan
         env:
@@ -93,6 +90,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Apply
+        working-directory: ./tf
         if: steps.plan.outputs.exitcode == '2'
         run: terraform apply -auto-approve plan.tfplan
         env:
