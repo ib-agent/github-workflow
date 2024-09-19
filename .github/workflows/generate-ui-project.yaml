@@ -16,11 +16,6 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -86,6 +81,11 @@ jobs:
 
       - name: Generate Project with Cruft
         run: cruft link ${{ steps.parse_template_info.outputs.template_url }} --no-input
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Generate yarn.lock
         run: |
