@@ -52,18 +52,19 @@ jobs:
         run: |
           # Get modified policy JSON files in the 'tf' directory and exclude child directory 
             modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/[^/]*\.json$')
-            echo "::set-output name=modified_files::$modified_files"
+            echo "modified_files=$modified_files" >> "$GITHUB_OUTPUT"
 
             if [ -n "$modified_files" ]; then
-                echo "[INFO] Modified files found: $MODIFIED_FILES"
-                echo "::set-output name=modified::true"
+                echo "[INFO] Modified files found: $modified_files"
+                echo "modified=true" >> "$GITHUB_OUTPUT"
             else
                 echo "[INFO] No modified files found."
-                echo "::set-output name=modified::false"
+                echo "modified=false" >> "$GITHUB_OUTPUT"
             fi
 
       - name: Create and attach temporary policy 
         if: steps.check-modified-files.outputs.modified == 'true'
+        working-directory: tf/
         env:
           PROJECT_NAME: ${{ inputs.github_repository }}
           AWS_ACCOUNT_ID: ${{ inputs.aws_account_id }}
@@ -71,14 +72,15 @@ jobs:
         run: |
           # Get the current date in the format YYYYMMDDHHMMSS with GMT-6 offset
           timestamp=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
-          echo "::set-output name=timestamp::$timestamp"
+          echo "timestamp=$timestamp" >> "$GITHUB_OUTPUT"
 
           # GitHubActionsRole
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
 
           for file in $MODIFIED_FILES; do
               # Create policy from the JSON file
-              policy_name="$(basename $file .json)-temporary-$timestamp"
+              file_name=$(echo $file | cut -d'/' -f2)
+              policy_name="$(basename $file_name .json)-temporary-$timestamp"
               
               echo "[INFO] Create policy $policy_name"
               aws iam create-policy \
