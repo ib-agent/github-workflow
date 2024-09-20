@@ -87,7 +87,7 @@ jobs:
             echo "[INFO] Create policy $policy_name"
             aws iam create-policy \
               --policy-name $policy_name \
-              --policy-document file://$file
+              --policy-document file://$file_name
             
             # Attach policy to the GitHubActionsRole
             echo "[INFO] Attach $policy_name to $github_action_role" 
