@@ -49,32 +49,38 @@ jobs:
         id: check-modified-files
         run: |
           # Get modified policy JSON files in the 'tf' directory and exclude child directory 
-          modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/[^/]*\.json$')
+          if git rev-parse HEAD~1 >/dev/null 2>&1; then
+              modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/[^/]*\.json$')
+          else
+              echo "No previous commit found. Checking changes from the initial commit."
+              modified_files=$(git diff --name-only HEAD | grep '^tf/[^/]*\.json$')
+          fi
+
+          echo "::set-output name=modified_files::$modified_files"
+
           if [ -n "$modified_files" ]; then
-              echo "[INFO] Modified files found: $MODIFIED_FILES"
+              echo "[INFO] Modified files found: $modified_files"
               echo "::set-output name=modified::true"
           else
               echo "[INFO] No modified files found."
               echo "::set-output name=modified::false"
           fi
 
-      - name: Check policy json files modified in last commit
+      - name: Create and attach temporary policy 
         if: steps.check-modified-files.outputs.modified == 'true'
         env:
           PROJECT_NAME: ${{ inputs.github_repository }}
           AWS_ACCOUNT_ID: ${{ inputs.aws_account_id }}
+          MODIFIED_FILES: ${{ steps.check-modified-files.outputs.modified_files }}
         run: |
           # Get the current date in the format YYYYMMDDHHMMSS with GMT-6 offset
           timestamp=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
           echo "::set-output name=timestamp::$timestamp"
 
-          # Get modified JSON files in the 'tf' directory and exclude child directory
-          modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/[^/]*\.json$')
-
           # GitHubActionsRole
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
 
-          for file in $modified_files; do
+          for file in $MODIFIED_FILES; do
               # Create policy from the JSON file
               policy_name="$(basename $file .json)-temporary-$timestamp"
               
@@ -153,7 +159,7 @@ jobs:
         if: needs.check-new-policy.outputs.modified == 'true'
         env:
           PROJECT_NAME: ${{ inputs.github_repository }}
-          TIMESTAMP: ${{ needs.check-new-policy.outputs.timestamp }}
+          timestamp: ${{ needs.check-new-policy.outputs.timestamp }}
         run: |
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
           temporary_policy_arn=$(aws iam list-attached-role-policies --role-name GitHubActionsRole --query "AttachedPolicies[?contains(PolicyName, '-temporary-$TIMESTAMP')].PolicyArn" --output text)
