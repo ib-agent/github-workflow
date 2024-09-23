@@ -31,6 +31,10 @@ jobs:
       run:
         working-directory: ./tf
 
+    outputs:
+      modified: ${{ steps.check-modified-files.outputs.modified }}
+      timestamp: ${{ steps.create-temporary-policy.outputs.timestamp }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -61,7 +65,8 @@ jobs:
             echo "modified=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create and attach temporary policy 
+      - name: Create and attach temporary policy
+        id: create-temporary-policy
         if: steps.check-modified-files.outputs.modified == 'true'
         working-directory: tf/
         env:
