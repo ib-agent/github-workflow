@@ -68,7 +68,7 @@ jobs:
             cd ..
             rm -rf $TEMP_DIR
 
-            echo "Layer created and zipped as ${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip"
+            echo "Layer created and zipped as ${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip" 
             echo "layer_created=true" >> $GITHUB_OUTPUT 
           else
             echo "No requirements.txt found. Skipping layer creation."
