@@ -52,6 +52,7 @@ jobs:
           fi
 
       - name: Check for requirements.txt and install dependencies
+        id: check_requirements
         run: |
           if [ -f "requirements.txt" ]; then
             TEMP_DIR=$(mktemp -d)
@@ -68,9 +69,11 @@ jobs:
             rm -rf $TEMP_DIR
 
             echo "Layer created and zipped as ${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip"
+            echo "layer_created=true" >> $GITHUB_OUTPUT 
           else
             echo "No requirements.txt found. Skipping layer creation."
           fi
+
       - name: Upload Lambda layer zip to S3 (if created)
         if: success() && steps.check_requirements.outputs.layer_created == 'true'
         run: |
