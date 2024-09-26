@@ -80,6 +80,8 @@ jobs:
 
             cd $TEMP_DIR
             zip -r ../${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip .
+            pwd
+            ls -lah
             cd ..
             rm -rf $TEMP_DIR
 
