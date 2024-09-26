@@ -75,7 +75,7 @@ jobs:
           fi
 
       - name: Upload Lambda layer zip to S3 (if created)
-        if: steps.check_requirements.outputs.layer_created == 'true'
+        if: success() && steps.check_requirements.outputs.layer_created == 'true'
         run: |
           aws s3 cp ${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip s3://${{ vars.LAMBDA_BUCKET_PREFIX}}-${{ vars.AWS_ACCOUNT_ID}}/${{ steps.set_artifact_name.outputs.artifact_name }}/${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip
 
