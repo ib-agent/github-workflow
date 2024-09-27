@@ -94,6 +94,17 @@ jobs:
         run: |
           aws s3 cp ${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip s3://${{ vars.LAMBDA_BUCKET_PREFIX}}-${{ vars.AWS_ACCOUNT_ID}}/${{ steps.set_artifact_name.outputs.artifact_name }}/${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip
 
+      - name: Publish Lambda layer version
+        env:
+          PROJECT_NAME: ${{ github.event.repository.name }}
+        run: |
+          zip_file="${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip"
+          aws lambda publish-layer-version \
+            --layer-name "$PROJECT_NAME-layer" \
+            --description "Lambda layer for $PROJECT_NAME dependencies" \
+            --compatible-runtimes python3.12 \
+            --zip-file fileb://$zip_file
+
   upload:
     needs:
       - layer
