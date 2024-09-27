@@ -80,9 +80,7 @@ jobs:
 
             cd $TEMP_DIR
             zip -r ../${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip .
-            pwd
-            ls -lah
-            cd ..
+            cp -v ../${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip ${GITHUB_WORKSPACE}
             rm -rf $TEMP_DIR
 
             echo "Layer created and zipped as ${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip" 
@@ -94,8 +92,6 @@ jobs:
       - name: Upload Lambda layer zip to S3 (if created)
         if: success() && steps.check_requirements.outputs.layer_created == 'true'
         run: |
-          pwd
-          ls -lah
           aws s3 cp ${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip s3://${{ vars.LAMBDA_BUCKET_PREFIX}}-${{ vars.AWS_ACCOUNT_ID}}/${{ steps.set_artifact_name.outputs.artifact_name }}/${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip
 
   upload:
