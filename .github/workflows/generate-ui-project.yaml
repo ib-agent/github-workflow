@@ -1,0 +1,115 @@
+name: Generate Project
+
+on:
+  workflow_call:
+    inputs:
+      project_name:
+        description: 'Name of the project repository'
+        required: true
+        type: string
+      version:
+        description: 'Project version'
+        required: true
+        type: string
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Do not run scaffolding on template repository
+        run: |
+          curl --silent -X GET \
+            -H "Authorization: token ${{ secrets.GH_TOKEN }}" \
+            -H "Accept: application/vnd.github.baptiste-preview+json" \
+            https://api.github.com/repos/${{ github.repository }} \
+            | jq --exit-status '.is_template == false'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          pip install cookiecutter cruft
+          sudo apt-get install -y jq
+
+      - name: Fetch Template Repository Details
+        id: template_info
+        run: |
+          curl --silent -X GET \
+            -H "Authorization: token ${{ secrets.GH_TOKEN }}" \
+            -H "Accept: application/vnd.github.baptiste-preview+json" \
+            https://api.github.com/repos/${{ github.repository }} \
+            | jq -r '.template_repository | {clone_url, default_branch}' > template_info.json
+
+      - name: Parse Template Repository Info
+        id: parse_template_info
+        run: |
+          template_url=$(jq -r '.clone_url' template_info.json)
+          template_commit=$(jq -r '.default_branch' template_info.json)
+          echo "template_url=$template_url" >> "$GITHUB_OUTPUT"
+          echo "template_commit=$template_commit" >> "$GITHUB_OUTPUT"
+
+      - name: Update cookiecutter.json with inputs
+        run: |
+          jq --arg project_name "${{ inputs.project_name }}" \
+             --arg version "${{ inputs.version }}" \
+             '.project_name=$project_name | .version=$version' \
+             cookiecutter.json > tmp.$$.json && mv tmp.$$.json cookiecutter.json
+
+      - name: Generate Project with Cookiecutter
+        run: cookiecutter . --no-input --verbose
+
+      - name: Set up GitHub authentication for Cruft
+        run: |
+          git config --global url."https://${{ secrets.GH_TOKEN }}:@github.com/".insteadOf "https://github.com/"
+
+
+      - name: Move project directory
+        run: |
+          rm -rf .github .gitignore .releaserc.yaml README.md cookiecutter.json images
+          shopt -s dotglob
+          cp -r ${{ inputs.project_name }}/* .
+          shopt -u dotglob
+          rm -rf ${{ inputs.project_name }}
+          template_dir=$(find . -type d -name '{{ cookiecutter.project_name }}')
+          rm -rf "$template_dir"
+
+      - name: Generate Project with Cruft
+        run: cruft link ${{ steps.parse_template_info.outputs.template_url }} --no-input
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Generate yarn.lock
+        run: |
+          yarn install
+
+      - name: Print Directory Structure after cruft
+        run: |
+          echo "Directory structure:"
+          ls -R
+
+      - name: Cleanup
+        run: rm -rf template
+
+      - name: Get branch name
+        id: branch
+        run: |
+          branch_name="update-${{ inputs.project_name }}-$(date +'%Y%m%d%H%M%S')"
+          echo "branch_name=$branch_name" >> "$GITHUB_OUTPUT"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v3
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          commit-message: "feat: Initialize project from template"
+          title: "feat: Initialize project from template"
+          body: "This PR initializes the project structure from the cookiecutter template."
+          branch: ${{ steps.branch.outputs.branch_name }}
