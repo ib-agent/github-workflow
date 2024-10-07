@@ -144,7 +144,7 @@ jobs:
           AWS_ACCOUNT_ID_DEV: ${{ inputs.aws_account_id_dev }}
         run: |
           echo "[info] replace value for default policy files"
-          find . -type f -name "*.json" -exec sed -i 's/\${AWS_REGION}/'"$AWS_REGION"'/g; s/\${AWS_REGION_DEV}/'"$AWS_REGION_DEV"'/g; s/\${AWS_ACCOUNT_ID}/'"$AWS_ACCOUNT_ID"'/g; s/\${AWS_ACCOUNT_ID_DEV}/'"$AWS_ACCOUNT_ID_DEV"'/g; s/\${USER_NAME}/'"$github_repository_owner"'/g; s/\${PROJECT_NAME}/'"$PROJECT_NAME"'/g' {} \;
+          find . -type f -name "*.json" -exec sed -i 's/\${AWS_REGION}/'"$AWS_REGION"'/g; s/\${AWS_REGION_DEV}/'"$AWS_REGION_DEV"'/g; s/\${AWS_ACCOUNT_ID}/'"$AWS_ACCOUNT_ID"'/g; s/\${AWS_ACCOUNT_ID_DEV}/'"$AWS_ACCOUNT_ID_DEV"'/g; s/\${USER_NAME}/'"$GITHUB_REPOSITORY_OWNER"'/g; s/\${PROJECT_NAME}/'"$PROJECT_NAME"'/g' {} \;
           
       - name: Create GitHubActionsRole for project
         working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
