@@ -23,6 +23,14 @@ on:
         description: 'Version number'
         required: true
         type: string
+      aws_region_dev:
+        description: 'AWS Region for development'
+        required: true
+        default: 'us-west-2'
+      aws_account_id_dev:
+        description: 'AWS Account ID for development'
+        required: true
+        default: '905418256626'
 
 permissions:
   id-token: write
@@ -47,6 +55,8 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry: ${{ inputs.aws_account_id_dev }}.dkr.ecr.${{ inputs.aws_region_dev }}.amazonaws.com  # Cross-account ECR registry
 
       - name: Build and push Docker image
         env:
