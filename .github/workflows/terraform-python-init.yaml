@@ -111,7 +111,7 @@ jobs:
           AWS_ACCOUNT_ID_PROD: ${{ inputs.aws_account_id_prod }}
         run: |
           # Replace default value 
-          echo "[info] replace default value for ECR Cross Account Access Policy"
+          echo "[INFO] replace default value for ECR Cross Account Access Policy"
           find . -type f -name "*.json" -exec sed -i 's/\${AWS_ACCOUNT_ID_PROD}/'"$AWS_ACCOUNT_ID_PROD"'/g' {} \;
           policy_file="ECRCrossAccountAccessPolicy.json"
 
