@@ -103,7 +103,7 @@ jobs:
           fi
 
       - name: Check & create ECR repository
-        if: ${{ matrix.environment }} == 'development'
+        if: ${{ matrix.environment == 'development' }}
         working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
         env:
           PROJECT_NAME: ${{ inputs.project_name }}
