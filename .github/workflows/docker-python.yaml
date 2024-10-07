@@ -25,11 +25,11 @@ on:
         type: string
       aws_region_dev:
         description: 'AWS Region for development'
-        required: true
+        type: string
         default: 'us-west-2'
       aws_account_id_dev:
         description: 'AWS Account ID for development'
-        required: true
+        type: string
         default: '905418256626'
 
 permissions:
