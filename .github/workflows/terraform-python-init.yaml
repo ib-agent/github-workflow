@@ -41,7 +41,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        environment: [development, production]
+        environment: [production, development]
+      max-parallel: 1
     steps:
       - name: Set env
         id: set_env
@@ -102,10 +103,18 @@ jobs:
           fi
 
       - name: Check & create ECR repository
+        if: ${{ matrix.environment }} == 'development'
+        working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
         env:
           PROJECT_NAME: ${{ inputs.project_name }}
           AWS_REGION: ${{ steps.set_env.outputs.aws_region }}
+          AWS_ACCOUNT_ID_PROD: ${{ inputs.aws_account_id_prod }}
         run: |
+          # Replace default value 
+          echo "[info] replace default value for ECR Cross Account Access Policy"
+          find . -type f -name "*.json" -exec sed -i 's/\${AWS_ACCOUNT_ID_PROD}/'"$AWS_ACCOUNT_ID_PROD"'/g' {} \;
+          policy_file="ECRCrossAccountAccessPolicy.json"
+
           # ECR repository
           ecr_repository_name="$PROJECT_NAME-repo"
           if aws ecr describe-repositories --repository-names $ecr_repository_name --region $AWS_REGION 2>/dev/null; then
@@ -117,6 +126,12 @@ jobs:
               --image-scanning-configuration scanOnPush=true \
               --tags Key=Name,Value="cabernet_ai_app_repository" \
               --region $AWS_REGION 
+
+            echo "[INFO] Attach Cross-Account Access Policy for account id: $AWS_ACCOUNT_ID_PROD"
+            aws ecr set-repository-policy \
+            --repository-name $ecr_repository_name \
+            --policy-text file://$policy_file \
+            --region $AWS_REGION
           fi
 
       - name: Replace value for default policy files 
@@ -125,9 +140,11 @@ jobs:
           PROJECT_NAME: ${{ inputs.project_name }}
           AWS_ACCOUNT_ID: ${{ steps.set_env.outputs.aws_account_id }} 
           AWS_REGION: ${{ steps.set_env.outputs.aws_region }}
+          AWS_REGION_DEV: ${{ inputs.aws_region_dev }}
+          AWS_ACCOUNT_ID_DEV: ${{ inputs.aws_account_id_dev }}
         run: |
-          echo "[INFO] Replace value for default policy files"
-          find . -type f -name "*.json" -exec sed -i 's/\${AWS_REGION}/'"$AWS_REGION"'/g; s/\${AWS_ACCOUNT_ID}/'"$AWS_ACCOUNT_ID"'/g; s/\${USER_NAME}/'"$GITHUB_REPOSITORY_OWNER"'/g; s/\${PROJECT_NAME}/'"$PROJECT_NAME"'/g' {} \;
+          echo "[info] replace value for default policy files"
+          find . -type f -name "*.json" -exec sed -i 's/\${AWS_REGION}/'"$AWS_REGION"'/g; s/\${AWS_REGION_DEV}/'"$AWS_REGION_DEV"'/g; s/\${AWS_ACCOUNT_ID}/'"$AWS_ACCOUNT_ID"'/g; s/\${AWS_ACCOUNT_ID_DEV}/'"$AWS_ACCOUNT_ID_DEV"'/g; s/\${USER_NAME}/'"$github_repository_owner"'/g; s/\${PROJECT_NAME}/'"$PROJECT_NAME"'/g' {} \;
           
       - name: Create GitHubActionsRole for project
         working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
