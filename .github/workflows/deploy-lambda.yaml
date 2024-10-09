@@ -98,7 +98,7 @@ jobs:
         env:
           PROJECT_NAME: ${{ github.event.repository.name }}
         run: |
-          zip_file="${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip"
+          zip_file="${GITHUB_WORKSPACE}/${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip"
           aws lambda publish-layer-version \
             --layer-name "$PROJECT_NAME-layer" \
             --description "Lambda layer for $PROJECT_NAME dependencies" \
