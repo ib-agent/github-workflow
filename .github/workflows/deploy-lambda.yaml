@@ -97,6 +97,7 @@ jobs:
       - name: Publish Lambda layer version
         env:
           PROJECT_NAME: ${{ github.event.repository.name }}
+        working-directory: ${GITHUB_WORKSPACE}
         run: |
           zip_file="${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip"
           aws lambda publish-layer-version \
