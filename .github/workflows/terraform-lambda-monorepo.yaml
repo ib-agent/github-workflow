@@ -86,11 +86,10 @@ jobs:
         if: steps.check-modified-files.outputs.modified == 'true'
         working-directory: ./${{ inputs.working_dir }}
         env:
-          WORKING_DIR: ${{ inputs.working_dir }}
-        env:
           PROJECT_NAME: ${{ github.event.repository.name }}
           AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ vars.AWS_REGION }}
+          WORKING_DIR: ${{ inputs.working_dir }}
         run: |
           # Get the current date in the format YYYYMMDDHHMMSS with GMT-6 offset
           timestamp=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
