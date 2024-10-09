@@ -84,7 +84,7 @@ jobs:
       - name: Create and attach temporary policy
         id: create-temporary-policy 
         if: steps.check-modified-files.outputs.modified == 'true'
-        working-directory: ./${{ inputs.working_dir }}
+        working-directory: ./${{ inputs.working_dir }}/tf
         env:
           AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ vars.AWS_REGION }}
