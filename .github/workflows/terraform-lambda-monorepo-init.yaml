@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       project_name:
-        description: 'The GitHub repository name'
+        description: 'Lambda name'
         required: true
         type: string
       aws_account_id_dev:
@@ -69,8 +69,8 @@ jobs:
 
       - name: Initialize Lambda
         run: |
-          PROJECT_NAME=${{ github.event.inputs.project_name }}
-          cookiecutter --no-input --output-dir working_directory  working_directory/lambda-template project_name=$PROJECT_NAME
+          PROJECT_NAME=${{ inputs.project_name }}
+          cookiecutter --no-input --output-dir working_directory working_directory/lambda-template project_name=$PROJECT_NAME
 
       - name: List working directory structure
         run: |
@@ -83,13 +83,13 @@ jobs:
 
       - name: Move Lambda to services directory
         run: |
-          PROJECT_NAME=${{ github.event.inputs.project_name }}
+          PROJECT_NAME=${{ inputs.project_name }}
           mv working_directory/$PROJECT_NAME services/$PROJECT_NAME
 
       - name: Upload services directory as an artifact
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ github.event.inputs.project_name }}
+          name: ${{ inputs.project_name }}
           path: services/${{ github.event.inputs.project_name }}
 
   init:
