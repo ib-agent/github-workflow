@@ -86,12 +86,12 @@ jobs:
         if: steps.check-modified-files.outputs.modified == 'true'
         working-directory: ./${{ inputs.working_dir }}
         env:
-          PROJECT_NAME: ${{ github.event.repository.name }}
           AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ vars.AWS_REGION }}
           WORKING_DIR: ${{ inputs.working_dir }}
         run: |
           # Get the current date in the format YYYYMMDDHHMMSS with GMT-6 offset
+          PROJECT_NAME=$(basename $WORKING_DIR)
           timestamp=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
           echo "timestamp=$timestamp" >> "$GITHUB_OUTPUT"
 
@@ -212,9 +212,10 @@ jobs:
       - name: Detach and Delete Temporary Policies
         if: needs.check-new-policy.outputs.modified == 'true'
         env:
-          PROJECT_NAME: ${{ github.event.repository.name }}
           TIMESTAMP: ${{ needs.check-new-policy.outputs.timestamp }}
+          WORKING_DIR: ${{ inputs.working_dir }}
         run: |
+          PROJECT_NAME=$(basename $WORKING_DIR)
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
           temporary_policy_arn=$(aws iam list-attached-role-policies --role-name $github_action_role --query "AttachedPolicies[?contains(PolicyName, '-temporary-$TIMESTAMP')].PolicyArn" --output text)
           for policy_arn in $temporary_policy_arn; do
