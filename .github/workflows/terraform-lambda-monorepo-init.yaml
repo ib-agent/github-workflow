@@ -87,9 +87,9 @@ jobs:
           mv working_directory/$PROJECT_NAME services/$PROJECT_NAME
 
       - name: Upload services directory as an artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: lambda-name
+          name: ${{ inputs.project_name }}
           path: services/${{ github.event.inputs.project_name }}
 
   init:
@@ -129,7 +129,7 @@ jobs:
       - name: Download Artifact
         uses: actions/download-artifact@v4
         with:
-          name: lambda-name 
+          name: ${{ inputs.project_name }}
 
       - name: Move Artifact to Services Directory
         run: |
