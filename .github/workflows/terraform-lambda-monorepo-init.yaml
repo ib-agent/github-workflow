@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       project_name:
-        description: 'The GitHub repository name'
+        description: 'Lambda name'
         required: true
         type: string
       aws_account_id_dev:
@@ -37,12 +37,68 @@ permissions:
   contents: read
 
 jobs:
+  service-init:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout monorepo
+        uses: actions/checkout@v4
+
+      - name: Set up GitHub authentication for Cruft
+        run: |
+          git config --global url."https://${{ secrets.GH_TOKEN }}:@github.com/".insteadOf "https://github.com/"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Clone cookiecutter-lambda template repository
+        run: |
+          mkdir -p working_directory
+          mkdir -p working_directory/lambda-template
+          git clone https://github.com/ib-agent/cookiecutter-lambda.git working_directory/lambda-template
+          rm -rf working_directory/lambda-template/.git
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          pip install cookiecutter cruft
+          sudo apt-get install -y jq
+
+      - name: Initialize Lambda
+        run: |
+          PROJECT_NAME=${{ inputs.project_name }}
+          cookiecutter --no-input --output-dir working_directory working_directory/lambda-template project_name=$PROJECT_NAME
+
+      - name: List working directory structure
+        run: |
+          echo "Directory structure of /tmp/working_directory:"
+          apt-get update && apt-get install -y tree
+          tree -a working_directory
+
+      - name: Ensure services directory exists
+        run: mkdir -p services
+
+      - name: Move Lambda to services directory
+        run: |
+          PROJECT_NAME=${{ inputs.project_name }}
+          mv working_directory/$PROJECT_NAME services/$PROJECT_NAME
+
+      - name: Upload services directory as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.project_name }}
+          path: services/${{ github.event.inputs.project_name }}
+
   init:
+    needs:
+      - service-init
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        environment: [production, development]
-      max-parallel: 1
+        environment: [development, production]
     steps:
       - name: Set env
         id: set_env
@@ -62,6 +118,23 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Create Services if Not Exist
+        run: |
+          if [ ! -d "services" ]; then
+            mkdir services
+            echo "services directory created."
+          fi
+
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.project_name }}
+
+      - name: Move Artifact to Services Directory
+        run: |
+          mv ${{ inputs.project_name }} services/
+          echo "$PROJECT_NAME moved to services directory."
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -102,52 +175,18 @@ jobs:
               --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
           fi
 
-      - name: Check & create ECR repository
-        if: ${{ matrix.environment }} == 'development'
-        working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
-        env:
-          PROJECT_NAME: ${{ inputs.project_name }}
-          AWS_REGION: ${{ steps.set_env.outputs.aws_region }}
-          AWS_ACCOUNT_ID_PROD: ${{ inputs.aws_account_id_prod }}
-        run: |
-          # Replace default value 
-          echo "[info] replace default value for ECR Cross Account Access Policy"
-          find . -type f -name "*.json" -exec sed -i 's/\${AWS_ACCOUNT_ID_PROD}/'"$AWS_ACCOUNT_ID_PROD"'/g' {} \;
-          policy_file="ECRCrossAccountAccessPolicy.json"
-
-          # ECR repository
-          ecr_repository_name="$PROJECT_NAME-repo"
-          if aws ecr describe-repositories --repository-names $ecr_repository_name --region $AWS_REGION 2>/dev/null; then
-            echo "[INFO] Repository $ecr_repository_name already exists."
-          else
-            echo "[INFO] Creating repository: $ecr_repository_name"
-            aws ecr create-repository \
-              --repository-name $ecr_repository_name \
-              --image-scanning-configuration scanOnPush=true \
-              --tags Key=Name,Value="cabernet_ai_app_repository" \
-              --region $AWS_REGION 
-
-            echo "[INFO] Attach Cross-Account Access Policy for account id: $AWS_ACCOUNT_ID_PROD"
-            aws ecr set-repository-policy \
-            --repository-name $ecr_repository_name \
-            --policy-text file://$policy_file \
-            --region $AWS_REGION
-          fi
-
       - name: Replace value for default policy files 
-        working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
+        working-directory: ./services/${{ inputs.project_name }}/tf/default-policy
         env:
           PROJECT_NAME: ${{ inputs.project_name }}
           AWS_ACCOUNT_ID: ${{ steps.set_env.outputs.aws_account_id }} 
           AWS_REGION: ${{ steps.set_env.outputs.aws_region }}
-          AWS_REGION_DEV: ${{ inputs.aws_region_dev }}
-          AWS_ACCOUNT_ID_DEV: ${{ inputs.aws_account_id_dev }}
         run: |
-          echo "[info] replace value for default policy files"
-          find . -type f -name "*.json" -exec sed -i 's/\${AWS_REGION}/'"$AWS_REGION"'/g; s/\${AWS_REGION_DEV}/'"$AWS_REGION_DEV"'/g; s/\${AWS_ACCOUNT_ID}/'"$AWS_ACCOUNT_ID"'/g; s/\${AWS_ACCOUNT_ID_DEV}/'"$AWS_ACCOUNT_ID_DEV"'/g; s/\${USER_NAME}/'"$github_repository_owner"'/g; s/\${PROJECT_NAME}/'"$PROJECT_NAME"'/g' {} \;
+          echo "[INFO] Replace value for default policy files"
+          find . -type f -name "*.json" -exec sed -i 's/\${AWS_REGION}/'"$AWS_REGION"'/g; s/\${AWS_ACCOUNT_ID}/'"$AWS_ACCOUNT_ID"'/g; s/\${USER_NAME}/'"$GITHUB_REPOSITORY_OWNER"'/g; s/\${PROJECT_NAME}/'"$PROJECT_NAME"'/g' {} \;
           
       - name: Create GitHubActionsRole for project
-        working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
+        working-directory: ./services/${{ inputs.project_name }}/tf/default-policy
         env:
           PROJECT_NAME: ${{ inputs.project_name }}
         run: |
@@ -163,7 +202,7 @@ jobs:
           fi
 
       - name: Create policies & attatch to GitHubActionsRole 
-        working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
+        working-directory: ./services/${{ inputs.project_name }}/tf/default-policy
         env:
           PROJECT_NAME: ${{ inputs.project_name }}
         run: |
