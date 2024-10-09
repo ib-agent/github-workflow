@@ -37,7 +37,64 @@ permissions:
   contents: read
 
 jobs:
+  service-init:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout monorepo
+        uses: actions/checkout@v4
+
+      - name: Set up GitHub authentication for Cruft
+        run: |
+          git config --global url."https://${{ secrets.GH_TOKEN }}:@github.com/".insteadOf "https://github.com/"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Clone cookiecutter-lambda template repository
+        run: |
+          mkdir -p working_directory
+          mkdir -p working_directory/lambda-template
+          git clone https://github.com/ib-agent/cookiecutter-lambda.git working_directory/lambda-template
+          rm -rf working_directory/lambda-template/.git
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          pip install cookiecutter cruft
+          sudo apt-get install -y jq
+
+      - name: Initialize Lambda
+        run: |
+          PROJECT_NAME=${{ github.event.inputs.project_name }}
+          cookiecutter --no-input --output-dir working_directory  working_directory/lambda-template project_name=$PROJECT_NAME
+
+      - name: List working directory structure
+        run: |
+          echo "Directory structure of /tmp/working_directory:"
+          apt-get update && apt-get install -y tree
+          tree -a working_directory
+
+      - name: Ensure services directory exists
+        run: mkdir -p services
+
+      - name: Move Lambda to services directory
+        run: |
+          PROJECT_NAME=${{ github.event.inputs.project_name }}
+          mv working_directory/$PROJECT_NAME services/$PROJECT_NAME
+
+      - name: Upload services directory as an artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ github.event.inputs.project_name }}
+          path: services/${{ github.event.inputs.project_name }}
+
   init:
+    needs:
+      - service-init
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -61,6 +118,23 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Create Services if Not Exist
+        run: |
+          if [ ! -d "services" ]; then
+            mkdir services
+            echo "services directory created."
+          fi
+
+      - name: Download Artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{ inputs.project_name }}
+
+      - name: Move Artifact to Services Directory
+        run: |
+          mv ${{ inputs.project_name }} services/
+          echo "$PROJECT_NAME moved to services directory."
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
