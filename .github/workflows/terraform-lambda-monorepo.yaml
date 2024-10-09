@@ -103,7 +103,7 @@ jobs:
 
           for file in $modified_files; do
             # Create policy from the JSON file
-            file_name=$(echo $file | cut -d'/' -f2)
+            file_name=$(echo $file | cut -d'/' -f4)
             policy_name="$(basename $file_name .json)-temporary-$timestamp"
 
             echo "[INFO] Replace values in policy file $file_name"
