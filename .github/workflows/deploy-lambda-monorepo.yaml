@@ -96,12 +96,13 @@ jobs:
 
       - name: Publish Lambda layer version
         env:
-          PROJECT_NAME: ${{ github.event.repository.name }}
+          WORKING_DIR: ${{ inputs.working_dir }}
         run: |
           zip_file="${GITHUB_WORKSPACE}/${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip"
+          lambda_name=$(basename $WORKING_DIR)
           aws lambda publish-layer-version \
-            --layer-name "$PROJECT_NAME-layer" \
-            --description "Lambda layer for $PROJECT_NAME dependencies" \
+            --layer-name "$lambda_name-layer" \
+            --description "Lambda layer for $lambda_name dependencies" \
             --compatible-runtimes python3.12 \
             --zip-file fileb://$zip_file
 
