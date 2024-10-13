@@ -84,7 +84,6 @@ jobs:
       - name: Create and attach temporary policy
         id: create-temporary-policy 
         if: steps.check-modified-files.outputs.modified == 'true'
-        working-directory: tf/
         env:
           PROJECT_NAME: ${{ github.event.repository.name }}
           AWS_ACCOUNT_ID: ${{ inputs.aws_account_id }}
