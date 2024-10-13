@@ -84,6 +84,7 @@ jobs:
       - name: Create and attach temporary policy
         id: create-temporary-policy 
         if: steps.check-modified-files.outputs.modified == 'true'
+        working-directory: tf/
         env:
           PROJECT_NAME: ${{ github.event.repository.name }}
           AWS_ACCOUNT_ID: ${{ inputs.aws_account_id }}
@@ -112,7 +113,7 @@ jobs:
             s/\${USER_NAME}/$GITHUB_REPOSITORY_OWNER/g; \
             s/\${ORG_AWS_ACCOUNT_ID}/$ORG_AWS_ACCOUNT_ID/g; \
             s/\${ORG_AWS_REGION}/$ORG_AWS_REGION/g; \
-            s/\${PROJECT_NAME}/$PROJECT_NAME/g"; $file_name
+            s/\${PROJECT_NAME}/$PROJECT_NAME/g" $file_name
             
             echo "[INFO] Create policy $policy_name"
             aws iam create-policy \
