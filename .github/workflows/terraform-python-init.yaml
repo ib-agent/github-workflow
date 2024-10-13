@@ -128,10 +128,11 @@ jobs:
         working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
         env:
           PROJECT_NAME: ${{ inputs.project_name }}
-          AWS_REGION: ${{ steps.set_env.outputs.aws_region }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
           AWS_ACCOUNT_ID_PROD: ${{ inputs.aws_account_id_prod }}
         run: |
           policy_file="ECRCrossAccountAccessPolicy.json"
+          ecr_repository_name="$PROJECT_NAME-repo"
           # Replace default value 
           echo "[INFO] replace default value for ECR Cross Account Access Policy"
           find . -type f -name $policy_file -exec sed -i 's/\${AWS_ACCOUNT_ID}/'"$AWS_ACCOUNT_ID_PROD"'/g' {} \;
