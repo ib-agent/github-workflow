@@ -82,7 +82,7 @@ jobs:
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
 
           # Get modified policy JSON files in the 'tf' directory and exclude child directory 
-          modified_files=$(git diff --name-only --diff-filter=AM HEAD~1 HEAD | grep '^tf/[^/]*\.json$')
+          modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/[^/]*\.json$')
 
           for file in $modified_files; do
             # Create policy from the JSON file
