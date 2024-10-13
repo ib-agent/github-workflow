@@ -55,7 +55,7 @@ jobs:
         id: check-modified-files
         run: |
           # Get modified policy JSON files in the 'tf' directory and exclude child directory 
-          modified_files=$(git diff --name-only --diff-filter=AM HEAD~1 HEAD | grep '^tf/[^/]*\.json$' || true)
+          modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/[^/]*\.json$' || true)
 
           if [ -n "$modified_files" ]; then
             echo "[INFO] Modified files found: $modified_files"
@@ -87,6 +87,12 @@ jobs:
           for file in $modified_files; do
             # Create policy from the JSON file
             file_name=$(echo $file | cut -d'/' -f2)
+
+            if [ ! -f "$file" ]; then
+              echo "[INFO] $file has been removed"
+              continue
+            fi
+
             policy_name="$(basename $file_name .json)-temporary-$timestamp"
 
             echo "[INFO] Replace values in policy file $file_name"
