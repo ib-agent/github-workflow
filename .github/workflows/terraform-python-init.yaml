@@ -121,6 +121,7 @@ jobs:
               --image-scanning-configuration scanOnPush=true \
               --tags Key=Name,Value="cabernet_ai_app_repository" \
               --region $AWS_REGION
+          fi
 
       - name: Set up Cross-Account Access
         if: ${{ matrix.environment == 'development' }}
