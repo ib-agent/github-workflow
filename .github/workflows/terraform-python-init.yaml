@@ -143,6 +143,50 @@ jobs:
           --policy-text file://$policy_file \
           --region $AWS_REGION
 
+      - name: Set ECR images retention policy
+        if: ${{ matrix.environment == 'development' }}
+        env:
+          PROJECT_NAME: ${{ inputs.project_name }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_ACCOUNT_ID_PROD: ${{ inputs.aws_account_id_prod }}
+        run: |
+          ecr_repository_name="$PROJECT_NAME-repo"
+          echo "[INFO] Set ECR images retention policy"
+          aws ecr put-lifecycle-policy \
+          --repository-name $ecr_repository_name \
+          --lifecycle-policy-text '{
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Retain the last 10 production images",
+                "selection": {
+                  "tagStatus": "tagged",
+                  "tagPrefixList": ["production"],
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": {
+                  "type": "expire"
+                }
+              },
+              {
+                "rulePriority": 2,
+                "description": "Expire development images older than 30 days",
+                "selection": {
+                  "tagStatus": "tagged",
+                  "tagPrefixList": ["development"],
+                  "countType": "sinceImagePushed",
+                  "countNumber": 30,
+                  "countUnit": "days"
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }' \
+          --region $AWS_REGION
+
       - name: Replace value for default policy files 
         working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
         env:
