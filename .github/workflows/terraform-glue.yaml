@@ -96,8 +96,8 @@ jobs:
             # Create policy from the JSON file
             file_name=$(echo $file | cut -d'/' -f2)
 
-            if [ ! -f "$file" ]; then
-              echo "[INFO] $file has been removed"
+            if [ ! -f "$file_name" ]; then
+              echo "[INFO] $file_name has been removed"
               continue
             fi
 
