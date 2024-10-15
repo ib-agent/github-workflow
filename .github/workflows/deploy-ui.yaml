@@ -23,6 +23,14 @@ on:
         description: 'AWS ECR Repository'
         required: true
         type: string
+      aws_region_dev:
+        description: 'AWS Region for development'
+        type: string
+        default: 'us-west-2'
+      aws_account_id_dev:
+        description: 'AWS Account ID for development'
+        type: string
+        default: '905418256626'
 
 permissions:
   id-token: write
@@ -45,6 +53,8 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registries: ${{ inputs.aws_account_id_dev }}  # Cross-account ECR registry
 
       - name: Pull Docker image and extract artifact
         env:

@@ -89,6 +89,8 @@ jobs:
           PROJECT_NAME: ${{ github.event.repository.name }}
           AWS_ACCOUNT_ID: ${{ inputs.aws_account_id }}
           AWS_REGION: ${{ inputs.aws_region }}
+          ORG_AWS_REGION: ${{ vars.AWS_REGION }}
+          ORG_AWS_ACCOUNT_ID: ${{ vars.ORG_AWS_ACCOUNT_ID }}
         run: |
           # Get the current date in the format YYYYMMDDHHMMSS with GMT-6 offset
           timestamp=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
@@ -103,12 +105,20 @@ jobs:
           for file in $modified_files; do
             # Create policy from the JSON file
             file_name=$(echo $file | cut -d'/' -f2)
+
+            if [ ! -f "$file_name" ]; then
+              echo "[INFO] $file_name has been removed"
+              continue
+            fi
+
             policy_name="$(basename $file_name .json)-temporary-$timestamp"
 
             echo "[INFO] Replace values in policy file $file_name"
             sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
             s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g; \
             s/\${USER_NAME}/$GITHUB_REPOSITORY_OWNER/g; \
+            s/\${ORG_AWS_ACCOUNT_ID}/$ORG_AWS_ACCOUNT_ID/g; \
+            s/\${ORG_AWS_REGION}/$ORG_AWS_REGION/g; \
             s/\${PROJECT_NAME}/$PROJECT_NAME/g" $file_name
             
             echo "[INFO] Create policy $policy_name"
@@ -167,8 +177,10 @@ jobs:
         id: plan
         run: terraform plan -detailed-exitcode -out=plan.tfplan
         env:
-          TF_VAR_region: ${{ inputs.aws_region }}
+          TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
+          TF_VAR_org_aws_region: ${{ vars.AWS_REGION }}
+          TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
           TF_VAR_docker_image: ${{ inputs.docker_image }}
           TF_VAR_project_name: ${{ inputs.project_name }}
           TF_VAR_environment: ${{ inputs.environment }}
@@ -182,8 +194,10 @@ jobs:
         if: steps.plan.outputs.exitcode == '2'
         run: terraform apply -auto-approve plan.tfplan
         env:
-          TF_VAR_region: ${{ inputs.aws_region }}
+          TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
+          TF_VAR_org_aws_region: ${{ vars.AWS_REGION }}
+          TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
           TF_VAR_docker_image: ${{ inputs.docker_image }}
           TF_VAR_project_name: ${{ inputs.project_name }}
           TF_VAR_environment: ${{ inputs.environment }}
