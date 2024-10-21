@@ -35,6 +35,10 @@ on:
         description: 'version, used in dd tags'
         required: true
         type: string
+      init_role_to_assume:
+        description: 'TF Init Dev Role to Assume'
+        type: string
+        default: 'Python-TF-Init-GitHubActionsRole' 
 
 permissions:
   id-token: write
@@ -109,3 +113,48 @@ jobs:
           TF_VAR_datadog_site: ${{ inputs.dd_site }}
           TF_VAR_service_version: ${{ inputs.service_version }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  init-destroy:
+    needs:
+      - terraform-destroy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.init_role_to_assume }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Debug AWS credentials configuration
+        run: |
+          aws sts get-caller-identity
+
+      - name: Check & delete ECR repository
+        if: ${{ inputs.environment == 'development' }}
+        env:
+          PROJECT_NAME: ${{ inputs.project_name }}
+          ORG_AWS_REGION: ${{ vars.AWS_REGION }}
+          ORG_AWS_ACCOUNT_ID: ${{ vars.ORG_AWS_ACCOUNT_ID }}
+        run: |
+          # ECR repository
+          ecr_repository_name="$PROJECT_NAME-repo"
+          if aws ecr describe-repositories --repository-names $ecr_repository_name --region $AWS_REGION 2>/dev/null; then
+            echo "[INFO] Repository $ecr_repository_name found!!!"
+            echo "[INFO] Delete repository $ecr_repository_name from $ORG_AWS_ACCOUNT_ID"
+            aws ecr delete-repository --repository-name $ORG_AWS_ACCOUNT_ID --region $ORG_AWS_REGION --force
+          else
+            echo "[INFO] Repository $ecr_repository_name not found!!!"
+          fi
+
+      - name: Check & delete dymanodb state lock table 
+        env:
+          PROJECT_NAME: ${{ inputs.project_name }} 
+        run: |
+          # Main Lock State DynamoDB Table
+          main_table_name="$PROJECT_NAME-main-lock-table" 
+          if aws dynamodb describe-table --table-name $main_table_name 2>/dev/null; then
+            echo "[INFO] DynamoDB table $main_table_name found!!!"
+            aws dynamodb delete-table --table-name $main_table_name
+          else
+            echo "[INFO] DynamoDB table $main_table_name not found!!!"
+          fi
