@@ -106,7 +106,7 @@ jobs:
           --method PUT \
           -H "Accept: application/vnd.github+json" \
           "repos/${{ github.repository }}/environments/development-destroy/deployment_protection_rules" \
-          -f required_reviewers='[{"type":"Team", "id":"development-destroy"}]' \
+          -f required_reviewers='[{"type":"Team", "slug":"development-destroy"}]' \
           -f prevent_self_review=false \
           -f allow_bypass=false
 
@@ -118,7 +118,7 @@ jobs:
           --method PUT \
           -H "Accept: application/vnd.github+json" \
           "repos/${{ github.repository }}/environments/production-destroy/deployment_protection_rules" \
-          -f required_reviewers='[{"type":"Team", "id":"production-destroy"}]' \
+          -f required_reviewers='[{"type":"Team", "slug":"production-destroy"}]' \
           -f prevent_self_review=false \
           -f allow_bypass=false
 
