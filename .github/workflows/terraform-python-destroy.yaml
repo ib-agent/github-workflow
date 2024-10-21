@@ -19,10 +19,6 @@ on:
         description: 'AWS Role to Assume'
         required: true
         type: string
-      dd_site:
-        description: 'Datadog site to send to'
-        required: true
-        type: string
       environment:
         description: 'environment, used in dd tags'
         required: true
