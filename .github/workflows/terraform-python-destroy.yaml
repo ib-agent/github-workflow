@@ -23,6 +23,10 @@ on:
         description: 'environment, used in dd tags'
         required: true
         type: string
+      environment_destroy:
+        description: 'environment, used in terraform destroy'
+        required: true
+        type: string
 
 permissions:
   id-token: write
@@ -30,6 +34,7 @@ permissions:
 
 jobs:
   terraform-destroy:
+    environment: ${{ inputs.environment_destroy }} 
     runs-on: ubuntu-latest
     defaults:
       run:
