@@ -19,12 +19,20 @@ on:
         description: 'AWS Role to Assume'
         required: true
         type: string
+      dd_site:
+        description: 'Datadog site to send to'
+        required: true
+        type: string
       environment:
         description: 'environment, used in dd tags'
         required: true
         type: string
       environment_destroy:
         description: 'environment, used in terraform destroy'
+        required: true
+        type: string
+      service_version:
+        description: 'version, used in dd tags'
         required: true
         type: string
 
@@ -70,9 +78,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Terraform Destroy 
+      - name: Terraform Plan - Destroy
         working-directory: ./tf
-        run: terraform destroy -auto-approve 
+        id: plan-destroy
+        run: terraform plan -destroy -detailed-exitcode -out=plan.tfplan
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
@@ -80,4 +89,23 @@ jobs:
           TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
           TF_VAR_project_name: ${{ inputs.project_name }}
           TF_VAR_environment: ${{ inputs.environment }}
+          TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
+          TF_VAR_datadog_site: ${{ inputs.dd_site }}
+          TF_VAR_service_version: ${{ inputs.service_version }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Terraform Destroy 
+        working-directory: ./tf
+        if: steps.plan-destroy.outputs.exitcode == '2'
+        run: terraform destroy -auto-approve plan.tfplan
+        env:
+          TF_VAR_aws_region: ${{ inputs.aws_region }}
+          TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
+          TF_VAR_org_aws_region: ${{ vars.AWS_REGION }}
+          TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
+          TF_VAR_project_name: ${{ inputs.project_name }}
+          TF_VAR_environment: ${{ inputs.environment }}
+          TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
+          TF_VAR_datadog_site: ${{ inputs.dd_site }}
+          TF_VAR_service_version: ${{ inputs.service_version }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
