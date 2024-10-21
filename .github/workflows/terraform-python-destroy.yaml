@@ -97,7 +97,7 @@ jobs:
       - name: Terraform Destroy 
         working-directory: ./tf
         if: steps.plan-destroy.outputs.exitcode == '2'
-        run: terraform destroy -auto-approve plan.tfplan
+        run: terraform apply -auto-approve plan.tfplan
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
