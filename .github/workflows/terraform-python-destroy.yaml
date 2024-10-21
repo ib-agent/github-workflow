@@ -177,15 +177,15 @@ jobs:
               versions=$(aws iam list-policy-versions --policy-arn "$policy_arn" --query 'Versions[?IsDefaultVersion==`false`].VersionId' --output text)
 
               # If no non-default versions are found, continue
-              if [ -z "$VERSIONS" ]; then
+              if [ -z "$versions" ]; then
                 echo "No non-default policy versions found. Proceeding to delete the policy..."
               else
                 # Loop through and delete each non-default version
                 for version in $versions; do
-                  echo "Deleting version $VERSION of policy $POLICY_ARN..."
-                  aws iam delete-policy-version --policy-arn "$POLICY_ARN" --version-id "$VERSION"
+                  echo "Deleting version $version of policy $policy_arn..."
+                  aws iam delete-policy-version --policy-arn "$policy_arn" --version-id "$version"
                   if [ $? -ne 0 ]; then
-                    echo "Failed to delete policy version $VERSION"
+                    echo "Failed to delete policy version $version"
                     exit 1
                   fi
                 done
