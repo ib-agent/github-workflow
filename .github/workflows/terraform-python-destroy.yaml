@@ -123,6 +123,7 @@ jobs:
         id: set_env
         run: |
           init_role_to_assume="arn:aws:iam::${{ inputs.aws_account_id }}:role/${{ inputs.init_role }}"
+          echo "init_role_to_assume=$init_role_to_assume" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
