@@ -99,6 +99,29 @@ jobs:
           gh api --method PUT -H "Accept: application/vnd.github+json" repos/${{ github.repository }}/environments/production
           gh api --method PUT -H "Accept: application/vnd.github+json" repos/${{ github.repository }}/environments/production-destroy
 
+      - name: Set Environment Development-Destroy approval
+        run: |
+          echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
+          gh api \
+          --method PUT \
+          -H "Accept: application/vnd.github+json" \
+          "/repos/my-org/my-repo/environments/development-destroy/deployment_protection_rules" \
+          -f required_reviewers='[{"type":"Team", "id":"development-destroy"}]' \
+          -f prevent_self_review=false \
+          -f allow_bypass=false
+
+
+      - name: Set Environment Development-Destroy approval
+        run: |
+          echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
+          gh api \
+          --method PUT \
+          -H "Accept: application/vnd.github+json" \
+          "/repos/my-org/my-repo/environments/production-destroy/deployment_protection_rules" \
+          -f required_reviewers='[{"type":"Team", "id":"production-destroy"}]' \
+          -f prevent_self_review=false \
+          -f allow_bypass=false
+
       - name: Set Environment Variables for Development
         run: |
           echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
