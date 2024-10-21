@@ -172,6 +172,25 @@ jobs:
               echo "[INFO] Detach $policy_arn to $github_action_role"
               aws iam detach-role-policy --role-name $github_action_role --policy-arn $policy_arn
 
+              # List all policy versions
+              echo "Listing policy versions for $policy_arn..."
+              versions=$(aws iam list-policy-versions --policy-arn "$policy_arn" --query 'Versions[?IsDefaultVersion==`false`].VersionId' --output text)
+
+              # If no non-default versions are found, continue
+              if [ -z "$VERSIONS" ]; then
+                echo "No non-default policy versions found. Proceeding to delete the policy..."
+              else
+                # Loop through and delete each non-default version
+                for version in $versions; do
+                  echo "Deleting version $VERSION of policy $POLICY_ARN..."
+                  aws iam delete-policy-version --policy-arn "$POLICY_ARN" --version-id "$VERSION"
+                  if [ $? -ne 0 ]; then
+                    echo "Failed to delete policy version $VERSION"
+                    exit 1
+                  fi
+                done
+              fi
+
               echo "[INFO] Delete $policy_arn"
               aws iam delete-policy --policy-arn $policy_arn
             fi
