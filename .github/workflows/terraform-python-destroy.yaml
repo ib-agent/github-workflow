@@ -19,6 +19,10 @@ on:
         description: 'AWS Role to Assume'
         required: true
         type: string
+      dd_site:
+        description: 'Datadog site to send to'
+        required: true
+        type: string
       environment:
         description: 'environment, used in dd tags'
         required: true
@@ -81,6 +85,8 @@ jobs:
           TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
           TF_VAR_project_name: ${{ inputs.project_name }}
           TF_VAR_environment: ${{ inputs.environment }}
+          TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
+          TF_VAR_datadog_site: ${{ inputs.dd_site }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Apply
@@ -94,4 +100,6 @@ jobs:
           TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
           TF_VAR_project_name: ${{ inputs.project_name }}
           TF_VAR_environment: ${{ inputs.environment }}
+          TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
+          TF_VAR_datadog_site: ${{ inputs.dd_site }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}

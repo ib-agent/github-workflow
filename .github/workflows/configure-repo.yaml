@@ -92,10 +92,12 @@ jobs:
       - name: Create Environment for Development
         run: |
           gh api --method PUT -H "Accept: application/vnd.github+json" repos/${{ github.repository }}/environments/development
+          gh api --method PUT -H "Accept: application/vnd.github+json" repos/${{ github.repository }}/environments/development-destroy
 
       - name: Create Environment for Production
         run: |
           gh api --method PUT -H "Accept: application/vnd.github+json" repos/${{ github.repository }}/environments/production
+          gh api --method PUT -H "Accept: application/vnd.github+json" repos/${{ github.repository }}/environments/production-destroy
 
       - name: Set Environment Variables for Development
         run: |
