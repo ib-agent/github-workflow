@@ -35,7 +35,7 @@ on:
         description: 'version, used in dd tags'
         required: true
         type: string
-      init_role_to_assume:
+      init_role:
         description: 'TF Init Dev Role to Assume'
         type: string
         default: 'Python-TF-Init-GitHubActionsRole' 
@@ -59,7 +59,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/${{ inputs.init_role_to_assume }}
+          role-to-assume: ${{ inputs.role_to_assume }}
           aws-region: ${{ inputs.aws_region }}
 
       - name: Debug AWS credentials configuration
@@ -119,10 +119,15 @@ jobs:
       - terraform-destroy
     runs-on: ubuntu-latest
     steps:
+      - name: Set env
+        id: set_env
+        run: |
+          init_role_to_assume="arn:aws:iam::${{ inputs.aws_account_id }}:role/${{ inputs.init_role }}"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ inputs.init_role_to_assume }}
+          role-to-assume: ${{ steps.set_env.outputs.init_role_to_assume }}
           aws-region: ${{ inputs.aws_region }}
 
       - name: Debug AWS credentials configuration
