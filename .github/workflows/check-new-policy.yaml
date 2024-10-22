@@ -180,9 +180,7 @@ jobs:
             ]
           }' >> $policy_file
 
-          # Format the final JSON file nicely
-          jq '.' $policy_file > temp.json && mv temp.json $policy_file
-
+          echo $policy_file
 
           sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
           s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g; \
