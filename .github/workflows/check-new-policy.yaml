@@ -52,7 +52,7 @@ jobs:
         id: check-modified-files
         run: |
           # Get modified policy JSON files in the 'tf' directory and exclude child directory 
-          modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/.*\.json$' || true)
+          modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/[^/]*\.json$' || true)
           modified_default_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/default-policy/.*\.json$' || true)
 
           if [ -n "$modified_default_files" ]; then
@@ -94,7 +94,7 @@ jobs:
                 continue
               fi
 
-              file_path=$(realpath -s "${file#tf/}")
+              file_path=$(basename $file)
               policy_name="$PROJECT_NAME-$(basename $file_path .json)" 
 
               echo "[INFO] Replace values in policy file $file_name"
