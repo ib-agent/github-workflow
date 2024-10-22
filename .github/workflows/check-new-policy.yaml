@@ -120,9 +120,11 @@ jobs:
               file_names+=("$(basename "$file")")
             done
 
+            echo $file_names
+
             jq -s '{
               "Version": "2012-10-17",
-              "Statement": map(.Statement) | add
+              "Statement": map(.Statement) | add | flatten
             }' "${file_names[@]}" > $policy_file
 
 
