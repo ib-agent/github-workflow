@@ -86,7 +86,7 @@ jobs:
           # Get modified policy JSON files in the 'tf' directory and exclude child directory 
           modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/[^/]*\.json$')
 
-          if $modified_default_files; then
+          if [ -n "$modified_default_files" ]; then
             for file in $modified_default_files; do
               # Skip the file if it's named Trust.json
               if [[ $(basename "$file") == "TrustPolicy.json" ]]; then
@@ -112,7 +112,7 @@ jobs:
             done
           fi
 
-          if $modified_files; then
+          if [ -n "$modified_files" ]; then
             policy_file="temporary-$timestamp.json"
             policy_name="temporary-$timestamp"
 
