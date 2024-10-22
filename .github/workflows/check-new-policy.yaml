@@ -152,7 +152,7 @@ jobs:
             jq -s '{
               "Version": "2012-10-17",
               "Statement": map(.Statement) | add | flatten
-            }' "${file_names[@]}" > $policy_file
+            }' "${modified_files[@]}" > $policy_file
 
 
             sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
