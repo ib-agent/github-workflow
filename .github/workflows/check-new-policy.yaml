@@ -180,7 +180,7 @@ jobs:
             ]
           }' >> $policy_file
 
-          echo $policy_file
+          cat $policy_file
 
           sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
           s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g; \
