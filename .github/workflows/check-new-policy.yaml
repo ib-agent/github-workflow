@@ -146,9 +146,6 @@ jobs:
           policy_file="temporary-$timestamp.json"
           policy_name="temporary-$timestamp"
 
-          # Array of input files
-          files=("alb-policy.json" "ecs-policy.json")
-
           # Initialize the combined policy structure
           echo '{
               "Version": "2012-10-17",
@@ -159,13 +156,14 @@ jobs:
           # Process each file
           for file in "${files[@]}"; do
             # Check if file exists
-            if [ ! -f "$file" ]; then
-              echo "Error: File $file not found"
+            file_name=$(basename "$file")
+            if [ ! -f "$file_name" ]; then
+              echo "Error: File $file_name not found"
               continue
             fi
 
             # Extract the Statement array from each policy file and append
-            statements=$(jq -c '.Statement[]' "$file")
+            statements=$(jq -c '.Statement[]' "$file_name")
             while IFS= read -r statement; do
               # Add a comma if it's not the first statement
               if [ "$first_statement" = true ]; then
@@ -183,7 +181,7 @@ jobs:
           }' >> $policy_file
 
           # Format the final JSON file nicely
-          jq '.' $policy_file >temp.json && mv temp.json $policy_file
+          jq '.' $policy_file > temp.json && mv temp.json $policy_file
 
 
           sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
