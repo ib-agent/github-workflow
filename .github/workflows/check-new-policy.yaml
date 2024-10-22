@@ -87,45 +87,43 @@ jobs:
           # Get modified policy JSON files in the 'tf/default-policy' 
           modified_default_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/default-policy/.*\.json$')
 
-          if [ -n "$modified_default_files" ]; then
-            for file in $modified_default_files; do
-              # Skip the file if it's named Trust.json
-              if [[ $(basename "$file") == "TrustPolicy.json" || $(basename "$file") == "ECRCrossAccountAccessPolicy.json" ]]; then
-                continue
-              fi
+          for file in $modified_default_files; do
+            # Skip the file if it's named Trust.json
+            if [[ $(basename "$file") == "TrustPolicy.json" || $(basename "$file") == "ECRCrossAccountAccessPolicy.json" ]]; then
+              continue
+            fi
 
-              file_path=$(basename $file)
-              policy_name="$PROJECT_NAME-$(basename $file_path .json)" 
+            file_path=$(basename $file)
+            policy_name="$PROJECT_NAME-$(basename $file_path .json)" 
 
-              echo "[INFO] Replace values in policy file $file_name"
-              sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
-              s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g; \
-              s/\${USER_NAME}/$GITHUB_REPOSITORY_OWNER/g; \
-              s/\${ORG_AWS_ACCOUNT_ID}/$ORG_AWS_ACCOUNT_ID/g; \
-              s/\${ORG_AWS_REGION}/$ORG_AWS_REGION/g; \
-              s/\${PROJECT_NAME}/$PROJECT_NAME/g" $file_path
+            echo "[INFO] Replace values in policy file $file_name"
+            sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
+            s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g; \
+            s/\${USER_NAME}/$GITHUB_REPOSITORY_OWNER/g; \
+            s/\${ORG_AWS_ACCOUNT_ID}/$ORG_AWS_ACCOUNT_ID/g; \
+            s/\${ORG_AWS_REGION}/$ORG_AWS_REGION/g; \
+            s/\${PROJECT_NAME}/$PROJECT_NAME/g" $file_path
 
-              # Get all versions of the policy
-              policy_versions=$(aws iam list-policy-versions \
-                --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name" \
-                --query 'Versions[?IsDefaultVersion==`false`].VersionId' \
-                --output text)
-
-              # Loop through old versions and delete them
-              for version_id in $policy_versions; do
-                echo "[INFO] Deleting old version: $version_id"
-                aws iam delete-policy-version \
-                  --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name" \
-                  --version-id "$version_id"
-              done
-
-              echo "[INFO] Update $policy_name with new version"
-              aws iam create-policy-version \
+            # Get all versions of the policy
+            policy_versions=$(aws iam list-policy-versions \
               --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name" \
-              --policy-document file://$file_path \
-              --set-as-default
+              --query 'Versions[?IsDefaultVersion==`false`].VersionId' \
+              --output text)
+
+            # Loop through old versions and delete them
+            for version_id in $policy_versions; do
+              echo "[INFO] Deleting old version: $version_id"
+              aws iam delete-policy-version \
+                --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name" \
+                --version-id "$version_id"
             done
-          fi
+
+            echo "[INFO] Update $policy_name with new version"
+            aws iam create-policy-version \
+            --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name" \
+            --policy-document file://$file_path \
+            --set-as-default
+          done
 
       - name: Create and attach temporary policy
         if: steps.check-modified-files.outputs.modified == 'true'
@@ -144,63 +142,62 @@ jobs:
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
 
           # Get modified policy JSON files in the 'tf' directory and exclude child directory 
-          modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/[^/]*\.json$' | sed 's#^tf/##')
-          if [ -n "$modified_files" ]; then
-            policy_file="temporary-$timestamp.json"
-            policy_name="temporary-$timestamp"
+          modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/[^/]*\.json$')
+          policy_file="temporary-$timestamp.json"
+          policy_name="temporary-$timestamp"
 
-            echo '{
-              "Version": "2012-10-17",
-              "Statement": [' > $policy_file
+          echo '{
+            "Version": "2012-10-17",
+            "Statement": [' > $policy_file
 
-            first_file=true
+          first_file=true
 
-            # Process each file
-            for file in "${modified_files[@]}"; do
-              # Check if file exists
-              if [ ! -f "$file" ]; then
-                echo "Error: File $file not found"
-                continue
-              fi
+          # Process each file
+          for file in "${modified_files[@]}"; do
+            # Check if file exists
+            file_name=$(basename $file)
+            echo "[INFO] Processing: $file_name"
+            if [ ! -f "$file_name" ]; then
+              echo "Error: File $file not found"
+              continue
+            fi
 
-              # Extract the Statement array from each policy file and append
-              if [ "$first_file" = true ]; then
-                first_file=false
-              else
-                echo "," >> $policy_file
-              fi
+            # Extract the Statement array from each policy file and append
+            if [ "$first_file" = true ]; then
+              first_file=false
+            else
+              echo "," >> $policy_file
+            fi
 
-              jq -r '.Statement[]' "$file" | \
-              while IFS= read -r line; do
-                echo "$line" >> $policy_file
-              done
+            jq -r '.Statement[]' "$file_name" | \
+            while IFS= read -r line; do
+              echo "$line" >> $policy_file
             done
+          done
 
-            # Close the JSON structure
-            echo '
-              ]
-            }' >> $policy_file
+          # Close the JSON structure
+          echo '
+            ]
+          }' >> $policy_file
 
-            # Format the final JSON file nicely
-            jq '.' $policy_file > temp.json && mv temp.json $policy_file
+          # Format the final JSON file nicely
+          jq '.' $policy_file > temp.json && mv temp.json $policy_file
 
 
-            sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
-            s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g; \
-            s/\${USER_NAME}/$GITHUB_REPOSITORY_OWNER/g; \
-            s/\${ORG_AWS_ACCOUNT_ID}/$ORG_AWS_ACCOUNT_ID/g; \
-            s/\${ORG_AWS_REGION}/$ORG_AWS_REGION/g; \
-            s/\${PROJECT_NAME}/$PROJECT_NAME/g" $policy_file
-            
-            echo "[INFO] Create policy $policy_name"
-            aws iam create-policy \
-              --policy-name $policy_name \
-              --policy-document file://$policy_file
-            
-            # Attach policy to the GitHubActionsRole
-            echo "[INFO] Attach $policy_name to $github_action_role" 
-            aws iam attach-role-policy \
-              --role-name $github_action_role \
-              --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name"
-
-          fi
+          sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
+          s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g; \
+          s/\${USER_NAME}/$GITHUB_REPOSITORY_OWNER/g; \
+          s/\${ORG_AWS_ACCOUNT_ID}/$ORG_AWS_ACCOUNT_ID/g; \
+          s/\${ORG_AWS_REGION}/$ORG_AWS_REGION/g; \
+          s/\${PROJECT_NAME}/$PROJECT_NAME/g" $policy_file
+          
+          echo "[INFO] Create policy $policy_name"
+          aws iam create-policy \
+            --policy-name $policy_name \
+            --policy-document file://$policy_file
+          
+          # Attach policy to the GitHubActionsRole
+          echo "[INFO] Attach $policy_name to $github_action_role" 
+          aws iam attach-role-policy \
+            --role-name $github_action_role \
+            --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name"
