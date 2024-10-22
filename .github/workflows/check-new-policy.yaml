@@ -161,7 +161,7 @@ jobs:
               if [ ! -f "$file" ]; then
                 echo "Error: File $file not found"
                 continue
-              }
+              fi
 
               # Extract the Statement array from each policy file and append
               if [ "$first_file" = true ]; then
