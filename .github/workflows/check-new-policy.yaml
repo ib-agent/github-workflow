@@ -1,0 +1,147 @@
+
+name: check new Policy 
+
+on:
+  workflow_call:
+    inputs:
+      project_name:
+        description: 'The GitHub repository name'
+        required: true
+        type: string
+      aws_account_id:
+        description: 'The AWS account id'
+        required: true
+        type: string
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      role_to_assume:
+        description: 'AWS Role to Assume'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  check-new-policy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./tf
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.role_to_assume }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Debug AWS credentials configuration
+        run: |
+          aws sts get-caller-identity
+
+      - name: Check for modified policy JSON files
+        id: check-modified-files
+        run: |
+          # Get modified policy JSON files in the 'tf' directory and exclude child directory 
+          modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/.*\.json$' || true)
+
+          if [ -n "$modified_files" ]; then
+            echo "[INFO] Modified files found: $modified_files"
+            echo "modified=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "[INFO] No modified files found."
+            echo "modified=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and attach temporary policy
+        id: create-temporary-policy 
+        if: steps.check-modified-files.outputs.modified == 'true'
+        working-directory: tf/
+        env:
+          PROJECT_NAME: ${{ github.event.repository.name }}
+          AWS_ACCOUNT_ID: ${{ inputs.aws_account_id }}
+          AWS_REGION: ${{ inputs.aws_region }}
+          ORG_AWS_REGION: ${{ vars.AWS_REGION }}
+          ORG_AWS_ACCOUNT_ID: ${{ vars.ORG_AWS_ACCOUNT_ID }}
+        run: |
+          # Get the current date in the format YYYYMMDDHHMMSS with GMT-6 offset
+          timestamp=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
+          echo "timestamp=$timestamp" >> "$GITHUB_OUTPUT"
+
+          # GitHubActionsRole
+          github_action_role="$PROJECT_NAME-GitHubActionsRole"
+
+          # Get modified policy JSON files in the 'tf/default-policy' 
+          modified_default_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/default-policy/.*\.json$')
+
+          # Get modified policy JSON files in the 'tf' directory and exclude child directory 
+          modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/[^/]*\.json$')
+
+          if $modified_default_files; then
+            for file in $modified_default_files; do
+              # Skip the file if it's named Trust.json
+              if [[ $(basename "$file") == "TrustPolicy.json" ]]; then
+                continue
+              fi
+
+              file_path=$(realpath -s "${file#tf/}")
+              policy_name="$PROJECT_NAME-$(basename $file_path .json)" 
+
+              echo "[INFO] Replace values in policy file $file_name"
+              sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
+              s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g; \
+              s/\${USER_NAME}/$GITHUB_REPOSITORY_OWNER/g; \
+              s/\${ORG_AWS_ACCOUNT_ID}/$ORG_AWS_ACCOUNT_ID/g; \
+              s/\${ORG_AWS_REGION}/$ORG_AWS_REGION/g; \
+              s/\${PROJECT_NAME}/$PROJECT_NAME/g" $file_path
+
+              echo "[INFO] Update $policy_name with new version"
+              aws iam create-policy-version \
+              --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name" \
+              --policy-document file://$file_path \
+              --set-as-default
+            done
+          fi
+
+          if $modified_files; then
+            policy_file="temporary-$timestamp.json"
+            policy_name="temporary-$timestamp"
+
+            for file in "${modified_files[@]}"; do
+              file_names+=("$(basename "$file")")
+            done
+
+            jq -s '{
+              "Version": "2012-10-17",
+              "Statement": map(.Statement) | add
+            }' "${file_names[@]}" > $policy_file
+
+
+            sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
+            s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g; \
+            s/\${USER_NAME}/$GITHUB_REPOSITORY_OWNER/g; \
+            s/\${ORG_AWS_ACCOUNT_ID}/$ORG_AWS_ACCOUNT_ID/g; \
+            s/\${ORG_AWS_REGION}/$ORG_AWS_REGION/g; \
+            s/\${PROJECT_NAME}/$PROJECT_NAME/g" $policy_file
+            
+            echo "[INFO] Create policy $policy_name"
+            aws iam create-policy \
+              --policy-name $policy_name \
+              --policy-document file://$policy_file
+            
+            # Attach policy to the GitHubActionsRole
+            echo "[INFO] Attach $policy_name to $github_action_role" 
+            aws iam attach-role-policy \
+              --role-name $github_action_role \
+              --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name"
+
+          fi

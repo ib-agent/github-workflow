@@ -1,0 +1,49 @@
+name: Remove temporary policy 
+
+on:
+  workflow_call:
+    inputs:
+      project_name:
+        description: 'The GitHub repository name'
+        required: true
+        type: string
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      role_to_assume:
+        description: 'AWS Role to Assume'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  remove-temporary-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.role_to_assume }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Debug AWS credentials configuration
+        run: |
+          aws sts get-caller-identity
+
+      - name: Detach and Delete Temporary Policy
+        env:
+          PROJECT_NAME: ${{ inputs.project_name }}
+        run: |
+          github_action_role="$PROJECT_NAME-GitHubActionsRole"
+          temporary_policy_arn=$(aws iam list-attached-role-policies --role-name $github_action_role --query "AttachedPolicies[?contains(PolicyName, 'temporary-')].PolicyArn" --output text)
+          for policy_arn in $temporary_policy_arn; do
+            echo "[INFO] Detach $policy_arn to $github_action_role"
+            aws iam detach-role-policy --role-name $github_action_role --policy-arn $policy_arn
+
+            echo "[INFO] Delete $policy_arn"
+            aws iam delete-policy --policy-arn $policy_arn
+          done
