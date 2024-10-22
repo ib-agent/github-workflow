@@ -116,11 +116,14 @@ jobs:
             policy_file="temporary-$timestamp.json"
             policy_name="temporary-$timestamp"
 
+            # Initialize an empty array for the stripped file names
+            file_names=()
+
             for file in "${modified_files[@]}"; do
               file_names+=("$(basename "$file")")
             done
 
-            echo $file_names
+            echo ${file_names[@]}
 
             jq -s '{
               "Version": "2012-10-17",
