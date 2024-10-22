@@ -1,4 +1,4 @@
-name: Remove temporary policy 
+name: Delete temporary policy 
 
 on:
   workflow_call:

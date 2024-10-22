@@ -1,5 +1,5 @@
 
-name: check new Policy 
+name: Check new policy 
 
 on:
   workflow_call:
