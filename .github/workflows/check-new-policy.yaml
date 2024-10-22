@@ -149,10 +149,40 @@ jobs:
             policy_file="temporary-$timestamp.json"
             policy_name="temporary-$timestamp"
 
-            jq -s '{
+            echo '{
               "Version": "2012-10-17",
-              "Statement": map(.Statement) | add | flatten
-            }' "${modified_files[@]}" > $policy_file
+              "Statement": [' > $policy_file
+
+            first_file=true
+
+            # Process each file
+            for file in "${modified_files[@]}"; do
+              # Check if file exists
+              if [ ! -f "$file" ]; then
+                echo "Error: File $file not found"
+                continue
+              }
+
+              # Extract the Statement array from each policy file and append
+              if [ "$first_file" = true ]; then
+                first_file=false
+              else
+                echo "," >> $policy_file
+              fi
+
+              jq -r '.Statement[]' "$file" | \
+              while IFS= read -r line; do
+                echo "$line" >> $policy_file
+              done
+            done
+
+            # Close the JSON structure
+            echo '
+              ]
+            }' >> $policy_file
+
+            # Format the final JSON file nicely
+            jq '.' $policy_file > temp.json && mv temp.json $policy_file
 
 
             sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
