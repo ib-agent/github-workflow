@@ -133,7 +133,7 @@ jobs:
             file_names=()
 
             for file in "${modified_files[@]}"; do
-              file_names+=$(basename $file)
+              file_names+=$(basename "$file")
             done
 
             echo ${file_names[@]}
