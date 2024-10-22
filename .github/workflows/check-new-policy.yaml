@@ -104,6 +104,20 @@ jobs:
               s/\${ORG_AWS_REGION}/$ORG_AWS_REGION/g; \
               s/\${PROJECT_NAME}/$PROJECT_NAME/g" $file_path
 
+              # Get all versions of the policy
+              policy_versions=$(aws iam list-policy-versions \
+                --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name" \
+                --query 'Versions[?IsDefaultVersion==`false`].VersionId' \
+                --output text)
+
+              # Loop through old versions and delete them
+              for version_id in $policy_versions; do
+                echo "[INFO] Deleting old version: $version_id"
+                aws iam delete-policy-version \
+                  --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name" \
+                  --version-id "$version_id"
+              done
+
               echo "[INFO] Update $policy_name with new version"
               aws iam create-policy-version \
               --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name" \
