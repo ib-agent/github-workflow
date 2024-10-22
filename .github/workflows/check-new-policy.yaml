@@ -154,7 +154,7 @@ jobs:
           first_statement=true
 
           # Process each file
-          for file in "${files[@]}"; do
+          for file in "${modified_files[@]}"; do
             # Check if file exists
             file_name=$(basename "$file")
             if [ ! -f "$file_name" ]; then
