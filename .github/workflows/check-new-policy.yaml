@@ -89,7 +89,7 @@ jobs:
           if [ -n "$modified_default_files" ]; then
             for file in $modified_default_files; do
               # Skip the file if it's named Trust.json
-              if [[ $(basename "$file") == "TrustPolicy.json" ]]; then
+              if [[ $(basename "$file") == "TrustPolicy.json" || $(basename "$file") == "ECRCrossAccountAccessPolicy.json" ]]; then
                 continue
               fi
 
