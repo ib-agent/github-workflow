@@ -53,19 +53,27 @@ jobs:
         run: |
           # Get modified policy JSON files in the 'tf' directory and exclude child directory 
           modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/.*\.json$' || true)
+          modified_default_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/default-policy/.*\.json$' || true)
+
+          if [ -n "$modified_default_files" ]; then
+            echo "[INFO] Modified default policy files found: $modified_default_files"
+            echo "default-modified=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "[INFO] No modified default policy files found"
+            echo "default-modified=false" >> "$GITHUB_OUTPUT"
+          fi
 
           if [ -n "$modified_files" ]; then
-            echo "[INFO] Modified files found: $modified_files"
+            echo "[INFO] Modified policy files found: $modified_files"
             echo "modified=true" >> "$GITHUB_OUTPUT"
           else
-            echo "[INFO] No modified files found."
+            echo "[INFO] No modified policy files found."
             echo "modified=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create and attach temporary policy
-        id: create-temporary-policy 
-        if: steps.check-modified-files.outputs.modified == 'true'
-        working-directory: tf/
+      - name: Update default policy 
+        if: steps.check-modified-files.outputs.default-modified == 'true'
+        working-directory: tf/default-policy/
         env:
           PROJECT_NAME: ${{ github.event.repository.name }}
           AWS_ACCOUNT_ID: ${{ inputs.aws_account_id }}
@@ -75,16 +83,9 @@ jobs:
         run: |
           # Get the current date in the format YYYYMMDDHHMMSS with GMT-6 offset
           timestamp=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
-          echo "timestamp=$timestamp" >> "$GITHUB_OUTPUT"
-
-          # GitHubActionsRole
-          github_action_role="$PROJECT_NAME-GitHubActionsRole"
 
           # Get modified policy JSON files in the 'tf/default-policy' 
           modified_default_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/default-policy/.*\.json$')
-
-          # Get modified policy JSON files in the 'tf' directory and exclude child directory 
-          modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/[^/]*\.json$')
 
           if [ -n "$modified_default_files" ]; then
             for file in $modified_default_files; do
@@ -126,17 +127,27 @@ jobs:
             done
           fi
 
+      - name: Create and attach temporary policy
+        if: steps.check-modified-files.outputs.modified == 'true'
+        working-directory: tf/
+        env:
+          PROJECT_NAME: ${{ github.event.repository.name }}
+          AWS_ACCOUNT_ID: ${{ inputs.aws_account_id }}
+          AWS_REGION: ${{ inputs.aws_region }}
+          ORG_AWS_REGION: ${{ vars.AWS_REGION }}
+          ORG_AWS_ACCOUNT_ID: ${{ vars.ORG_AWS_ACCOUNT_ID }}
+        run: |
+          # Get the current date in the format YYYYMMDDHHMMSS with GMT-6 offset
+          timestamp=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
+
+          # GitHubActionsRole
+          github_action_role="$PROJECT_NAME-GitHubActionsRole"
+
+          # Get modified policy JSON files in the 'tf' directory and exclude child directory 
+          modified_files=$(git diff --name-only HEAD~1 HEAD | grep '^tf/[^/]*\.json$' | sed 's#^tf/##')
           if [ -n "$modified_files" ]; then
             policy_file="temporary-$timestamp.json"
             policy_name="temporary-$timestamp"
-
-            file_names=()
-
-            for file in "${modified_files[@]}"; do
-              file_names+=$(basename "$file")
-            done
-
-            echo ${file_names[@]}
 
             jq -s '{
               "Version": "2012-10-17",
