@@ -34,6 +34,9 @@ jobs:
   check-new-policy:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_dir }}/tf
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -52,7 +55,6 @@ jobs:
 
       - name: Check for modified policy JSON files
         id: check-modified-files
-        working-directory: ./${{ inputs.working_dir }}
         env:
           WORKING_DIR: ${{ inputs.working_dir }}
         run: |
@@ -78,7 +80,7 @@ jobs:
 
       - name: Update default policy 
         if: steps.check-modified-files.outputs.default-modified == 'true'
-        working-directory: ./${{ inputs.working_dir }}/tf/default-policy/
+        working-directory: ${{ inputs.working_dir }}/tf/default-policy/
         env:
           PROJECT_NAME: ${{ inputs.project_name }}
           AWS_ACCOUNT_ID: ${{ inputs.aws_account_id }}
@@ -133,7 +135,7 @@ jobs:
 
       - name: Create and attach temporary policy
         if: steps.check-modified-files.outputs.modified == 'true'
-        working-directory: ./${{ inputs.working_dir }}/tf/
+        working-directory: ${{ inputs.working_dir }}/tf/
         env:
           PROJECT_NAME: ${{ inputs.project_name }}
           AWS_ACCOUNT_ID: ${{ inputs.aws_account_id }}
