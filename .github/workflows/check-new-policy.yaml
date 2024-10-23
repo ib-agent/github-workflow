@@ -146,6 +146,8 @@ jobs:
           policy_file="temporary-$timestamp.json"
           policy_name="temporary-$timestamp"
 
+          echo $modified_files
+
           # Initialize the combined policy structure
           echo '{
               "Version": "2012-10-17",
@@ -157,7 +159,6 @@ jobs:
           for file in "${modified_files[@]}"; do
             # Check if file exists
             file_name=$(basename "$file")
-            echo $file_name
             if [ ! -f "$file_name" ]; then
               echo "Error: File $file_name not found"
               continue
