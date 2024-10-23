@@ -151,6 +151,8 @@ jobs:
               "Version": "2012-10-17",
               "Statement": [' > $policy_file
 
+          first_statement=true
+
           # Process each file
           for file in "${modified_files[@]}"; do
             echo $file
@@ -165,7 +167,11 @@ jobs:
             statements=$(jq -c '.Statement[]' "$file_name")
             while IFS= read -r statement; do
               # Add a comma if it's not the first statement
-              echo "," >> $policy_file
+              if [ "$first_statement" = true ]; then
+                first_statement=false
+              else
+                echo "," >> $policy_file
+              fi
               echo "$statement" >> $policy_file
             done <<<"$statements"
           done
