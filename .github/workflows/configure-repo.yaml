@@ -106,7 +106,7 @@ jobs:
           -H "Accept: application/vnd.github+json" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
            /orgs/$GITHUB_REPOSITORY_OWNER/teams/development-destroy | jq '.id')
-          read -r -d '' PAYLOAD <<- JSON
+          cat <<- JSON > payload.json
           {
               "prevent_self_review": false,
               "reviewers": [
@@ -117,14 +117,13 @@ jobs:
             ]
           }
           JSON
-
-          echo "$PAYLOAD" | gh api \
+          gh api \
           --method PUT \
           -H "Accept: application/vnd.github+json" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
           -H "Content-Type: application/json" \
           "/repos/${{ github.repository }}/environments/development-destroy" \
-          --input -
+          --input payload.json 
 
       # - name: Set Environment Production-Destroy approval
       #   run: |
