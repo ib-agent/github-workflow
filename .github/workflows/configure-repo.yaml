@@ -114,8 +114,6 @@ jobs:
           "/repos/${{ github.repository }}/environments/development-destroy" \
           -F "prevent_self_review=false" \
           -f "reviewers[][type]=Team" -F "reviewers[][id]=$team_id"
-          exit 1
-
 
       # - name: Set Environment Production-Destroy approval
       #   run: |
