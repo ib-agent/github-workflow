@@ -114,7 +114,7 @@ jobs:
           -H "Content-Type: application/json" \
           "/repos/${{ github.repository }}/environments/development-destroy" \
           -F "prevent_self_review=false" \
-          -F reviewers="[{'type': 'Team', 'id': $team_id}]'
+          -F reviewers="[{'type':'Team','id':$team_id}]"
 
       # - name: Set Environment Production-Destroy approval
       #   run: |
