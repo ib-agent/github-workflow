@@ -100,20 +100,22 @@ jobs:
           gh api --method PUT -H "Accept: application/vnd.github+json" repos/${{ github.repository }}/environments/production-destroy
 
       - name: Set Environment Development-Destroy approval
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token 
+          echo $GH_TOKEN | gh auth login --with-token 
           team_id=$(gh api \
           -H "Accept: application/vnd.github+json" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
            /orgs/$GITHUB_REPOSITORY_OWNER/teams/development-destroy | jq '.id')
-           echo $team_id
-          gh api \
-          --method PUT \
+          echo $team_id
+          curl -L \
+          -X PUT \
           -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer $GH_TOKEN" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
-          "/repos/${{ github.repository }}/environments/development-destroy" \
-          -F "prevent_self_review=false" \
-          -f "reviewers[][type]=Team" -F "reviewers[][id]=$team_id"
+          "https://api.github.com/repos/${{ github.repository }}/environments/development-destroy" \
+          -d '{"wait_timer":30,"prevent_self_review":false,"reviewers":[{"type":"User","id":1},{"type":"Team","id":1}],"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}'
 
       # - name: Set Environment Production-Destroy approval
       #   run: |
