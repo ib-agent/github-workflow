@@ -103,7 +103,7 @@ jobs:
         run: |
           echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token 
           # gh api -H "Accept: application/vnd.github+json" "/orgs/ib-agent/teams/development-destroy" | jq '.id'
-          gh api -H "Accept: application/vnd.github+json" "/orgs/ib-agent/teams/development-destroy"
+          gh api -H "Accept: application/vnd.github+json" "/orgs/ib-agent/teams"
           # gh api \
           # --method PUT \
           # -H "Accept: application/vnd.github+json" \
