@@ -102,7 +102,7 @@ jobs:
       - name: Set Environment Development-Destroy approval
         run: |
           echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token 
-          gh api -H "Accept: application/vnd.github+json" "/orgs/ib-agent/teams/development-destroy" | jq '.id')
+          gh api -H "Accept: application/vnd.github+json" "/orgs/ib-agent/teams/development-destroy" | jq '.id'
           echo $team_id
           # gh api \
           # --method PUT \
