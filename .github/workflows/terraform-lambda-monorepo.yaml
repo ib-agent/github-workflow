@@ -31,109 +31,9 @@ permissions:
   contents: read
 
 jobs:
-  check-new-policy:
-    environment: ${{ inputs.environment }}
-    runs-on: ubuntu-latest
-
-    outputs:
-      modified: ${{ steps.check-modified-files.outputs.modified }}
-      timestamp: ${{ steps.create-temporary-policy.outputs.timestamp }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Set role if not provided
-        id: set_role
-        run: |
-          if [ -z "${{ inputs.role_to_assume }}" ]; then
-            echo "role=${{ vars.ROLE_TO_ASSUME }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "role=${{ inputs.role_to_assume }}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ steps.set_role.outputs.role }}
-          aws-region: ${{ vars.AWS_REGION }}
-
-      - name: Debug AWS credentials configuration
-        run: |
-          aws sts get-caller-identity
-
-      - name: Check for modified policy JSON files
-        id: check-modified-files
-        working-directory: ./${{ inputs.working_dir }}
-        env:
-          WORKING_DIR: ${{ inputs.working_dir }}
-        run: |
-          # Get modified policy JSON files in the 'tf' directory and exclude child directory 
-          modified_files=$(git diff --name-only HEAD~1 HEAD | grep "^$WORKING_DIR/tf/[^/]*\.json$" || true)
-
-          if [ -n "$modified_files" ]; then
-            echo "[INFO] Modified files found: $modified_files"
-            echo "modified=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "[INFO] No modified files found."
-            echo "modified=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Create and attach temporary policy
-        id: create-temporary-policy 
-        if: steps.check-modified-files.outputs.modified == 'true'
-        working-directory: ./${{ inputs.working_dir }}/tf
-        env:
-          AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
-          AWS_REGION: ${{ vars.AWS_REGION }}
-          WORKING_DIR: ${{ inputs.working_dir }}
-        run: |
-          # Get the current date in the format YYYYMMDDHHMMSS with GMT-6 offset
-          PROJECT_NAME=$(basename $WORKING_DIR)
-          timestamp=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
-          echo "timestamp=$timestamp" >> "$GITHUB_OUTPUT"
-
-          # GitHubActionsRole
-          github_action_role="$PROJECT_NAME-GitHubActionsRole"
-
-          # Get modified policy JSON files in the 'tf' directory and exclude child directory 
-          modified_files=$(git diff --name-only HEAD~1 HEAD | grep "^$WORKING_DIR/tf/[^/]*\.json$" || true)
-
-          for file in $modified_files; do
-            # Create policy from the JSON file
-            file_name=$(echo $file | cut -d'/' -f4)
-
-            if [ ! -f "$file_name" ]; then
-              echo "[INFO] $file_name has been removed"
-              continue
-            fi
-
-            policy_name="$(basename $file_name .json)-temporary-$timestamp"
-
-            echo "[INFO] Replace values in policy file $file_name"
-            sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
-            s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g; \
-            s/\${USER_NAME}/$GITHUB_REPOSITORY_OWNER/g; \
-            s/\${PROJECT_NAME}/$PROJECT_NAME/g" $file_name
-            
-            echo "[INFO] Create policy $policy_name"
-            aws iam create-policy \
-              --policy-name $policy_name \
-              --policy-document file://$file_name
-            
-            # Attach policy to the GitHubActionsRole
-            echo "[INFO] Attach $policy_name to $github_action_role" 
-            aws iam attach-role-policy \
-              --role-name $github_action_role \
-              --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name"
-          done
-
   terraform:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
-    needs: check-new-policy
     defaults:
       run:
         working-directory: ./${{ inputs.working_dir }}/tf
@@ -214,20 +114,3 @@ jobs:
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_lambda_version: ${{ inputs.version }}
           TF_VAR_lambda_checksum: ${{ inputs.checksum }}
-
-      - name: Detach and Delete Temporary Policies
-        if: needs.check-new-policy.outputs.modified == 'true'
-        env:
-          TIMESTAMP: ${{ needs.check-new-policy.outputs.timestamp }}
-          WORKING_DIR: ${{ inputs.working_dir }}
-        run: |
-          PROJECT_NAME=$(basename $WORKING_DIR)
-          github_action_role="$PROJECT_NAME-GitHubActionsRole"
-          temporary_policy_arn=$(aws iam list-attached-role-policies --role-name $github_action_role --query "AttachedPolicies[?contains(PolicyName, '-temporary-$TIMESTAMP')].PolicyArn" --output text)
-          for policy_arn in $temporary_policy_arn; do
-            echo "[INFO] Detach $policy_arn to $github_action_role"
-            aws iam detach-role-policy --role-name $github_action_role --policy-arn $policy_arn
-
-            echo "[INFO] Delete $policy_arn"
-            aws iam delete-policy --policy-arn $policy_arn
-          done
