@@ -214,7 +214,7 @@ jobs:
           PROJECT_NAME: ${{ needs.get_env.outputs.project_name }}
         run: |
           state_bucket_name="cabernet-ai-$AWS_ACCOUNT_ID-state-bucket"
-          state_object_name="$PROJECT_NAME-main/terraform.tfstate"
+          state_object_name="$PROJECT_NAME/terraform.tfstate"
           # Check if the object exists
           if aws s3api head-object --bucket "$state_bucket_name" --key "$state_object_name" 2>/dev/null; then
               echo "Object exists. Deleting..."
