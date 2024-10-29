@@ -3,8 +3,8 @@ name: Terraform
 on:
   workflow_call:
     inputs:
-      environment:
-        description: 'The environment to build'
+      environment_destroy:
+        description: 'The environment to destroy TF resources'
         required: true
         type: string
       working_dir:
@@ -12,14 +12,23 @@ on:
         required: false
         default: '.'
         type: string
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      aws_account_id:
+        description: 'The AWS account id'
+        required: true
+        type: string
       role_to_assume:
         description: 'the aws role to assume'
-        required: false
+        required: true 
         default: ''
         type: string
       init_role:
         description: 'TF Init Dev Role to Assume'
         type: string
+        required: false 
         default: 'Python-TF-Init-GitHubActionsRole' 
 
 permissions:
@@ -27,33 +36,43 @@ permissions:
   contents: read
 
 jobs:
-  terraform-destroy:
+  get_env:
+    runs-on: ubuntu-latest
+    outputs:
+      aws_account_id: ${{ inputs.aws_account_id }}
+      aws_region: ${{ inputs.aws_region }}
+      role_to_assume: ${{ inputs.role_to_assume }}
+      project_name: ${{ steps.set_artifact_name.outputs.artifact_name }} 
+
+    steps:
+      - name: Set artifact name based on working directory
+        id: set_artifact_name
+        run: |
+          if [ "${{ inputs.working_dir }}" = "." ]; then
+            echo "artifact_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+          else
+            ARTIFACT_NAME=$(basename ${{ inputs.working_dir }})
+            echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          fi
+
+  terraform_destroy:
+    needs:
+      - get_env
     environment: ${{ inputs.environment_destroy }} 
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ${{ inputs.working_dir }}/tf
-    outputs:
-      project_name: ${{ steps.set_artifact_name.outputs.artifact_name }} 
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set role if not provided
-        id: set_role
-        run: |
-          if [ -z "${{ inputs.role_to_assume }}" ]; then
-            echo "role=${{ vars.ROLE_TO_ASSUME }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "role=${{ inputs.role_to_assume }}" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ steps.set_role.outputs.role }}
-          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ needs.get_env.outputs.role_to_assume }}
+          aws-region: ${{ needs.get_env.outputs.aws_region }}
 
       - name: Debug AWS credentials configuration
         run: |
@@ -71,45 +90,36 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Init
-        run: ./terraform-init.sh ${{ vars.AWS_ACCOUNT_ID }}
+        run: ./terraform-init.sh ${{ needs.get_env.outputs.aws_account_id }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Set artifact name based on working directory
-        id: set_artifact_name
-        run: |
-          if [ "${{ inputs.working_dir }}" = "." ]; then
-            echo "artifact_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
-          else
-            ARTIFACT_NAME=$(basename ${{ inputs.working_dir }})
-            echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
-          fi
 
       - name: Terraform Plan - Destroy
         id: plan-destroy
         run: terraform plan -destroy -detailed-exitcode -out=plan.tfplan
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          TF_VAR_project_name: ${{ steps.set_artifact_name.outputs.artifact_name }}
+          TF_VAR_project_name: ${{ needs.get_env.outputs.project_name }}
           TF_VAR_datadog_api_key_secret_arn: ${{ vars.DD_API_KEY_SECRET_ARN }}
           TF_VAR_datadog_site: ${{ vars.DD_SITE }}
-          TF_VAR_region: ${{ vars.AWS_REGION }}
-          TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+          TF_VAR_region: ${{ needs.get_env.outputs.aws_region }}
+          TF_VAR_aws_account_id: ${{ needs.get_env.outputs.aws_account_id }}
 
       - name: Terraform Destroy 
         if: steps.plan-destroy.outputs.exitcode == '2'
         run: terraform apply -auto-approve plan.tfplan
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          TF_VAR_project_name: ${{ steps.set_artifact_name.outputs.artifact_name }}
+          TF_VAR_project_name: ${{ needs.get_env.outputs.project_name }}
           TF_VAR_datadog_api_key_secret_arn: ${{ vars.DD_API_KEY_SECRET_ARN }}
           TF_VAR_datadog_site: ${{ vars.DD_SITE }}
-          TF_VAR_region: ${{ vars.AWS_REGION }}
-          TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+          TF_VAR_region: ${{ needs.get_env.outputs.aws_region }}
+          TF_VAR_aws_account_id: ${{ needs.get_env.outputs.aws_account_id }}
 
   init-destroy:
     needs:
-      - terraform-destroy
+      - get_env
+      - terraform_destroy
     runs-on: ubuntu-latest
     steps:
       - name: Set env
@@ -122,32 +132,15 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ steps.set_env.outputs.init_role_to_assume }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ needs.get_env.outputs.aws_region }} 
 
       - name: Debug AWS credentials configuration
         run: |
           aws sts get-caller-identity
 
-      # - name: Check & delete ECR repository
-      #   if: ${{ inputs.environment == 'development' }}
-      #   env:
-      #     PROJECT_NAME: ${{ inputs.project_name }}
-      #     ORG_AWS_REGION: ${{ vars.AWS_REGION }}
-      #     ORG_AWS_ACCOUNT_ID: ${{ vars.ORG_AWS_ACCOUNT_ID }}
-      #   run: |
-      #     # ECR repository
-      #     ecr_repository_name="$PROJECT_NAME-repo"
-      #     if aws ecr describe-repositories --repository-names $ecr_repository_name --region $AWS_REGION 2>/dev/null; then
-      #       echo "[INFO] Repository $ecr_repository_name found!!!"
-      #       echo "[INFO] Delete repository $ecr_repository_name from $ORG_AWS_ACCOUNT_ID"
-      #       aws ecr delete-repository --repository-name $ORG_AWS_ACCOUNT_ID --region $ORG_AWS_REGION --force
-      #     else
-      #       echo "[INFO] Repository $ecr_repository_name not found!!!"
-      #     fi
-      
       - name: Check & delete policies 
         env:
-          PROJECT_NAME: ${{ needs.terraform-destroy.outputs.project_name }}
+          PROJECT_NAME: ${{ needs.get_env.outputs.project_name }}
         run: |
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
           github_policies=("$PROJECT_NAME-GitHubActionsPolicy" "$PROJECT_NAME-AccessPolicy")
@@ -191,7 +184,7 @@ jobs:
 
       - name: Check & delete GitHubActionsRole
         env:
-          PROJECT_NAME: ${{ steps.set_artifact_name.outputs.artifact_name }}
+          PROJECT_NAME: ${{ needs.get_env.outputs.project_name }}
         run: |
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
           if aws iam get-role --role-name $github_action_role > /dev/null 2>&1; then
@@ -204,7 +197,7 @@ jobs:
 
       - name: Check & delete dymanodb state lock table 
         env:
-          PROJECT_NAME: ${{ needs.terraform-destroy.outputs.project_name }}
+          PROJECT_NAME: ${{ needs.get_env.outputs.project_name }}
         run: |
           # Main Lock State DynamoDB Table
           main_table_name="$PROJECT_NAME-main-lock-table" 
@@ -217,8 +210,8 @@ jobs:
 
       - name: Check & remove lock state object from s3 bucket
         env:
-          AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
-          PROJECT_NAME: ${{ needs.terraform-destroy.outputs.project_name }}
+          AWS_ACCOUNT_ID: ${{ needs.get_env.outputs.aws_account_id }}
+          PROJECT_NAME: ${{ needs.get_env.outputs.project_name }}
         run: |
           state_bucket_name="cabernet-ai-$AWS_ACCOUNT_ID-state-bucket"
           state_object_name="$PROJECT_NAME-main/terraform.tfstate"
