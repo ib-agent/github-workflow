@@ -1,0 +1,225 @@
+name: Terraform
+
+on:
+  workflow_call:
+    inputs:
+      environment_destroy:
+        description: 'The environment to destroy TF resources'
+        required: true
+        type: string
+      working_dir:
+        description: 'The directory of the Lambda function'
+        required: false
+        default: '.'
+        type: string
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      aws_account_id:
+        description: 'The AWS account id'
+        required: true
+        type: string
+      role_to_assume:
+        description: 'the aws role to assume'
+        required: true 
+        default: ''
+        type: string
+      init_role:
+        description: 'TF Init Dev Role to Assume'
+        type: string
+        required: false 
+        default: 'Python-TF-Init-GitHubActionsRole' 
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  get_env:
+    runs-on: ubuntu-latest
+    outputs:
+      aws_account_id: ${{ inputs.aws_account_id }}
+      aws_region: ${{ inputs.aws_region }}
+      role_to_assume: ${{ inputs.role_to_assume }}
+      project_name: ${{ steps.set_artifact_name.outputs.artifact_name }} 
+
+    steps:
+      - name: Set artifact name based on working directory
+        id: set_artifact_name
+        run: |
+          if [ "${{ inputs.working_dir }}" = "." ]; then
+            echo "artifact_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+          else
+            ARTIFACT_NAME=$(basename ${{ inputs.working_dir }})
+            echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          fi
+
+  terraform_destroy:
+    needs:
+      - get_env
+    environment: ${{ inputs.environment_destroy }} 
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_dir }}/tf
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ needs.get_env.outputs.role_to_assume }}
+          aws-region: ${{ needs.get_env.outputs.aws_region }}
+
+      - name: Debug AWS credentials configuration
+        run: |
+          aws sts get-caller-identity
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+
+      - name: Set up GitHub authentication for Terraform modules
+        run: |
+          git config --global url."https://$GITHUB_TOKEN:@github.com/".insteadOf "https://github.com/"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Terraform Init
+        run: ./terraform-init.sh ${{ needs.get_env.outputs.aws_account_id }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Terraform Plan - Destroy
+        id: plan-destroy
+        run: terraform plan -destroy -detailed-exitcode -out=plan.tfplan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          TF_VAR_project_name: ${{ needs.get_env.outputs.project_name }}
+          TF_VAR_datadog_api_key_secret_arn: ${{ vars.DD_API_KEY_SECRET_ARN }}
+          TF_VAR_datadog_site: ${{ vars.DD_SITE }}
+          TF_VAR_region: ${{ needs.get_env.outputs.aws_region }}
+          TF_VAR_aws_account_id: ${{ needs.get_env.outputs.aws_account_id }}
+
+      - name: Terraform Destroy 
+        if: steps.plan-destroy.outputs.exitcode == '2'
+        run: terraform apply -auto-approve plan.tfplan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          TF_VAR_project_name: ${{ needs.get_env.outputs.project_name }}
+          TF_VAR_datadog_api_key_secret_arn: ${{ vars.DD_API_KEY_SECRET_ARN }}
+          TF_VAR_datadog_site: ${{ vars.DD_SITE }}
+          TF_VAR_region: ${{ needs.get_env.outputs.aws_region }}
+          TF_VAR_aws_account_id: ${{ needs.get_env.outputs.aws_account_id }}
+
+  init-destroy:
+    needs:
+      - get_env
+      - terraform_destroy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set env
+        id: set_env
+        run: |
+          init_role_to_assume="arn:aws:iam::${{ inputs.aws_account_id }}:role/${{ inputs.init_role }}"
+          echo "init_role_to_assume=$init_role_to_assume" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.set_env.outputs.init_role_to_assume }}
+          aws-region: ${{ needs.get_env.outputs.aws_region }} 
+
+      - name: Debug AWS credentials configuration
+        run: |
+          aws sts get-caller-identity
+
+      - name: Check & delete policies 
+        env:
+          PROJECT_NAME: ${{ needs.get_env.outputs.project_name }}
+        run: |
+          github_action_role="$PROJECT_NAME-GitHubActionsRole"
+          github_policies=("$PROJECT_NAME-GitHubActionsPolicy" "$PROJECT_NAME-AccessPolicy")
+
+          # Loop through each file
+          for policy in "${github_policies[@]}"; do
+            echo "[INFO] Policy: $policy"
+            
+            # check if the policy exists
+            policy_arn=$(aws iam list-policies --query "Policies[?PolicyName=='$policy'].Arn" --output text 2>/dev/null)
+            if [ -z "$policy_arn" ]; then
+              echo "[INFO] $policy not found!!!"
+            else
+              echo "[INFO] $policy found!!!"
+              echo "[INFO] Detach $policy_arn to $github_action_role"
+              aws iam detach-role-policy --role-name $github_action_role --policy-arn $policy_arn
+
+              # List all policy versions
+              echo "Listing policy versions for $policy_arn..."
+              versions=$(aws iam list-policy-versions --policy-arn "$policy_arn" --query 'Versions[?IsDefaultVersion==`false`].VersionId' --output text)
+
+              # If no non-default versions are found, continue
+              if [ -z "$versions" ]; then
+                echo "No non-default policy versions found. Proceeding to delete the policy..."
+              else
+                # Loop through and delete each non-default version
+                for version in $versions; do
+                  echo "Deleting version $version of policy $policy_arn..."
+                  aws iam delete-policy-version --policy-arn "$policy_arn" --version-id "$version"
+                  if [ $? -ne 0 ]; then
+                    echo "Failed to delete policy version $version"
+                    exit 1
+                  fi
+                done
+              fi
+
+              echo "[INFO] Delete $policy_arn"
+              aws iam delete-policy --policy-arn $policy_arn
+            fi
+          done
+
+      - name: Check & delete GitHubActionsRole
+        env:
+          PROJECT_NAME: ${{ needs.get_env.outputs.project_name }}
+        run: |
+          github_action_role="$PROJECT_NAME-GitHubActionsRole"
+          if aws iam get-role --role-name $github_action_role > /dev/null 2>&1; then
+            echo "[INFO] IAM role $github_action_role found!!!"
+            echo "[INFO] Delete role: $github_action_role"
+            aws iam delete-role --role-name $github_action_role
+          else
+            echo "[INFO] IAM role $github_action_role not found!!!"
+          fi
+
+      - name: Check & delete dymanodb state lock table 
+        env:
+          PROJECT_NAME: ${{ needs.get_env.outputs.project_name }}
+        run: |
+          # Main Lock State DynamoDB Table
+          main_table_name="$PROJECT_NAME-main-lock-table" 
+          if aws dynamodb describe-table --table-name $main_table_name 2>/dev/null; then
+            echo "[INFO] DynamoDB table $main_table_name found!!!"
+            aws dynamodb delete-table --table-name $main_table_name
+          else
+            echo "[INFO] DynamoDB table $main_table_name not found!!!"
+          fi
+
+      - name: Check & remove lock state object from s3 bucket
+        env:
+          AWS_ACCOUNT_ID: ${{ needs.get_env.outputs.aws_account_id }}
+          PROJECT_NAME: ${{ needs.get_env.outputs.project_name }}
+        run: |
+          state_bucket_name="cabernet-ai-$AWS_ACCOUNT_ID-state-bucket"
+          state_object_name="$PROJECT_NAME-main/terraform.tfstate"
+          # Check if the object exists
+          if aws s3api head-object --bucket "$state_bucket_name" --key "$state_object_name" 2>/dev/null; then
+              echo "Object exists. Deleting..."
+              aws s3api delete-object --bucket $state_bucket_name --key $state_object_name 
+              echo "Object deleted."
+          else
+              echo "Object does not exist."
+          fi

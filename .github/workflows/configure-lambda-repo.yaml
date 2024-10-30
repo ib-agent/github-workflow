@@ -79,10 +79,80 @@ jobs:
       - name: Create Environment for Development
         run: |
           gh api --method PUT -H "Accept: application/vnd.github+json" repos/${{ github.repository }}/environments/development
+          gh api --method PUT -H "Accept: application/vnd.github+json" repos/${{ github.repository }}/environments/developer-admin
 
       - name: Create Environment for Production
         run: |
           gh api --method PUT -H "Accept: application/vnd.github+json" repos/${{ github.repository }}/environments/production
+          gh api --method PUT -H "Accept: application/vnd.github+json" repos/${{ github.repository }}/environments/production-admin
+
+      - name: Set Environment developer-admin approval
+        run: |
+          echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token 
+          team_id=$(gh api \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+           /orgs/$GITHUB_REPOSITORY_OWNER/teams/developer-admin | jq '.id')
+
+          gh api \
+          --method PUT \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          /orgs/$GITHUB_REPOSITORY_OWNER/teams/developer-admin/repos/${{ github.repository }} \
+          -f "permission=pull"
+
+          cat <<- JSON > payload.json
+          {
+              "prevent_self_review": false,
+              "reviewers": [
+              {
+                "type": "Team",
+                "id": $team_id 
+              }
+            ]
+          }
+          JSON
+          gh api \
+          --method PUT \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          -H "Content-Type: application/json" \
+          "/repos/${{ github.repository }}/environments/developer-admin" \
+          --input payload.json 
+
+      - name: Set Environment production-admin approval
+        run: |
+          echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token 
+          team_id=$(gh api \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+           /orgs/$GITHUB_REPOSITORY_OWNER/teams/production-admin | jq '.id')
+
+          gh api \
+          --method PUT \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          /orgs/$GITHUB_REPOSITORY_OWNER/teams/production-admin/repos/${{ github.repository }} \
+          -f "permission=pull"
+
+          cat <<- JSON > payload.json
+          {
+              "prevent_self_review": false,
+              "reviewers": [
+              {
+                "type": "Team",
+                "id": $team_id 
+              }
+            ]
+          }
+          JSON
+          gh api \
+          --method PUT \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          -H "Content-Type: application/json" \
+          "/repos/${{ github.repository }}/environments/production-admin" \
+          --input payload.json 
 
       - name: Set Environment Variables for Development
         run: |
