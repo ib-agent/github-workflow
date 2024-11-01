@@ -103,7 +103,7 @@ jobs:
 
       - name: Terraform Apply
         if: steps.plan.outputs.exitcode == '2'
-        run: terraform apply -auto-approve plan.tfplan -refresh=true
+        run: terraform apply -refresh=true -auto-approve plan.tfplan
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           TF_VAR_project_name: ${{ steps.set_artifact_name.outputs.artifact_name }}
