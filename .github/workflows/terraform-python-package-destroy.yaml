@@ -34,8 +34,6 @@ permissions:
 
 jobs:
   init-destroy:
-    needs:
-      - terraform-destroy
     runs-on: ubuntu-latest
     steps:
       - name: Set env
