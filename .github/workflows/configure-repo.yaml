@@ -46,7 +46,14 @@ jobs:
           gh api --method PUT repos/${{ github.repository }}/branches/main/protection --input - <<EOF
           {
            "required_status_checks": {
-             "strict": true
+             "strict": true,
+             "contexts": [
+               # "call_terraform / terraform",
+               # "call_build_ui / build-and-push",
+               # "call_deploy_ui / deploy",
+               # "call_lint / snyk",
+               # "call_tests / test"
+             ]
            },
            "enforce_admins": true,
            "required_pull_request_reviews": {
