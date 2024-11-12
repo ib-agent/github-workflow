@@ -11,12 +11,20 @@ on:
         description: 'AWS Account ID for production'
         required: true
         type: string
-      dd_api_key_secret_arn_dev:
-        description: 'ARN for the api key in secret manager'
+      aws_region_dev:
+        description: 'AWS Region for development'
         required: true
         type: string
-      dd_api_key_secret_arn_prod:
-        description: 'ARN for the api key in secret manager'
+      aws_region_prod:
+        description: 'AWS Region for production'
+        required: true
+        type: string
+      datadog_dd_site_dev:
+        description: 'Datadog DD Site for development'
+        required: true
+        type: string
+      datadog_dd_site_prod:
+        description: 'Datadog DD Site for production'
         required: true
         type: string
 
@@ -40,11 +48,10 @@ jobs:
            "required_status_checks": {
              "strict": true,
              "contexts": [
-              "call_test / test",
-              "call_deploy / layer",
-              "call_deploy / upload",
               "call_terraform / terraform",
-              "call_post-deploy / post-deployment-tests" 
+              "call_tests / test", 
+              "call_build_ui / build-and-push",
+              "call_deploy_ui / deploy"
              ]
            },
            "enforce_admins": true,
@@ -163,12 +170,14 @@ jobs:
         run: |
           echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
           gh variable set AWS_ACCOUNT_ID --repo ${{ github.repository }} --env=development --body="${{ inputs.aws_account_id_dev }}"
-          gh variable set DD_API_KEY_SECRET_ARN --repo ${{ github.repository }} --env=development --body="${{ inputs.dd_api_key_secret_arn_dev }}"
+          gh variable set AWS_REGION --repo ${{ github.repository }} --env=development --body="${{ inputs.aws_region_dev }}"
           gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=development --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_dev }}:role/${{ github.event.inputs.project_name }}-GitHubActionsRole"
+
 
       - name: Set Environment Variables for Production
         run: |
           echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
           gh variable set AWS_ACCOUNT_ID --repo ${{ github.repository }} --env=production --body="${{ inputs.aws_account_id_prod }}"
-          gh variable set DD_API_KEY_SECRET_ARN --repo ${{ github.repository }} --env=development --body="${{ inputs.dd_api_key_secret_arn_prod }}"
+          gh variable set AWS_REGION --repo ${{ github.repository }} --env=production --body="${{ inputs.aws_region_prod }}"
           gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=production --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_prod }}:role/${{ github.event.inputs.project_name }}-GitHubActionsRole"
+
