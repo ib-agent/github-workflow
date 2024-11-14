@@ -18,4 +18,4 @@ jobs:
         run: echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
 
       - name: Set Default Branch
-        run: gh repo edit ${{ github.repository }} --default-branch KAN-110-config-ui-dependabot
+        run: gh repo edit ${{ github.repository }} --default-branch KAN-102-versioning-GHA-role-s3-module
