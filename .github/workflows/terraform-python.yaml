@@ -77,43 +77,51 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Set the service_version variable 
+      - name: Set the service_version variable
         id: set_service_version
         run: | 
           echo "TF_VAR_service_version=$(echo '${{ inputs.service_version }}' | jq -c .)" >> $GITHUB_ENV
           echo "service_version=${TF_VAR_service_version}"
           echo "service_version=${TF_VAR_service_version}" >> $GITHUB_OUTPUT
 
+      - name: Create dev.tfvars with service_version value
+        working-directory: ./tf
+        run: |
+          service_version='${{ inputs.service_version }}'
+          echo "service_version = $service_version" > dev.tfvars
+
+      - name: View the dev.tfvars file
+        working-directory: ./tf
+        run: cat dev.tfvars
+
       - name: Terraform Plan
         working-directory: ./tf
         id: plan
-        run: terraform plan -detailed-exitcode -out=plan.tfplan -var="service_version=${{ steps.set_service_version.outputs.service_version }}"
+        run: terraform plan -detailed-exitcode -out=plan.tfplan -var-file=dev.tfvars
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
-          TF_VAR_org_aws_region: ${{ vars.AWS_REGION }}
-          TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
+          TF_VAR_org_aws_region: ${{ inputs.org_aws_region }}
+          TF_VAR_org_aws_account_id: ${{ inputs.org_aws_account_id }}
           TF_VAR_project_name: ${{ inputs.project_name }}
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
-          TF_VAR_datadog_site: ${{ inputs.dd_site }}
+          TF_VAR_datadog_site: ${{ inputs.datadog_site }}
           TF_VAR_main_version: ${{ inputs.main_version }}
-          TF_VAR_service_version: ${{ steps.set_service_version.outputs.service_version }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Apply
         working-directory: ./tf
         if: steps.plan.outputs.exitcode == '2'
-        run: terraform apply -auto-approve plan.tfplan
+        run: terraform apply -auto-approve -var-file=dev.tfvars
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
-          TF_VAR_org_aws_region: ${{ vars.AWS_REGION }}
-          TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
+          TF_VAR_org_aws_region: ${{ inputs.org_aws_region }}
+          TF_VAR_org_aws_account_id: ${{ inputs.org_aws_account_id }}
           TF_VAR_project_name: ${{ inputs.project_name }}
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
-          TF_VAR_datadog_site: ${{ inputs.dd_site }}
+          TF_VAR_datadog_site: ${{ inputs.datadog_site }}
           TF_VAR_main_version: ${{ inputs.main_version }}
-          TF_VAR_service_version: ${{ env.TF_VAR_service_version }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
