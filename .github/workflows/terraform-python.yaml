@@ -23,16 +23,16 @@ on:
         description: 'Datadog site to send to'
         required: true
         type: string
-      docker_image:
-        description: 'full url to the docker image'
-        required: true
-        type: string
       environment:
         description: 'environment, used in dd tags'
         required: true
         type: string
+      main_version:
+        description: 'Main version (Blue environment)'
+        required: true
+        type: string
       service_version:
-        description: 'version, used in dd tags'
+        description: 'Service version list of application'
         required: true
         type: string
 
@@ -77,6 +77,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
+      - name: Set the service_version variable 
+        id: set_service_version
+        run: | 
+          echo "TF_VAR_service_version=$(echo '${{ inputs.service_version }}' | jq -c .)" >> $GITHUB_ENV
+          echo $TF_VAR_service_version
+
       - name: Terraform Plan
         working-directory: ./tf
         id: plan
@@ -86,12 +92,12 @@ jobs:
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
           TF_VAR_org_aws_region: ${{ vars.AWS_REGION }}
           TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
-          TF_VAR_docker_image: ${{ inputs.docker_image }}
           TF_VAR_project_name: ${{ inputs.project_name }}
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
           TF_VAR_datadog_site: ${{ inputs.dd_site }}
-          TF_VAR_service_version: ${{ inputs.service_version }}
+          TF_VAR_main_version: ${{ inputs.main_version }}
+          TF_VAR_service_version: ${{ env.TF_VAR_service_version }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Apply
@@ -103,10 +109,10 @@ jobs:
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
           TF_VAR_org_aws_region: ${{ vars.AWS_REGION }}
           TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
-          TF_VAR_docker_image: ${{ inputs.docker_image }}
           TF_VAR_project_name: ${{ inputs.project_name }}
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
           TF_VAR_datadog_site: ${{ inputs.dd_site }}
-          TF_VAR_service_version: ${{ inputs.service_version }}
+          TF_VAR_main_version: ${{ inputs.main_version }}
+          TF_VAR_service_version: ${{ env.TF_VAR_service_version }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
