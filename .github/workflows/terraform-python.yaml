@@ -43,6 +43,8 @@ permissions:
 jobs:
   terraform:
     runs-on: ubuntu-latest
+    outputs:
+      service_version: ${{ steps.set_service_version.outputs.service_version }}
     defaults:
       run:
         working-directory: ./tf
@@ -84,20 +86,10 @@ jobs:
           echo "service_version=${TF_VAR_service_version}"
           echo "service_version=${TF_VAR_service_version}" >> $GITHUB_OUTPUT
 
-      - name: Create dev.tfvars with service_version value
-        working-directory: ./tf
-        run: |
-          service_version='${{ inputs.service_version }}'
-          echo "service_version = $service_version" > dev.tfvars
-
-      - name: View the dev.tfvars file
-        working-directory: ./tf
-        run: cat dev.tfvars
-
       - name: Terraform Plan
         working-directory: ./tf
         id: plan
-        run: terraform plan -detailed-exitcode -out=plan.tfplan -var-file=dev.tfvars
+        run: terraform plan -detailed-exitcode -out=plan.tfplan
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
@@ -108,12 +100,13 @@ jobs:
           TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
           TF_VAR_datadog_site: ${{ inputs.datadog_site }}
           TF_VAR_main_version: ${{ inputs.main_version }}
+          TF_VAR_service_version: ${{ steps.set_service_version.outputs.service_version }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Apply
         working-directory: ./tf
         if: steps.plan.outputs.exitcode == '2'
-        run: terraform apply -auto-approve -var-file=dev.tfvars
+        run: terraform apply -auto-approve
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
@@ -124,4 +117,5 @@ jobs:
           TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
           TF_VAR_datadog_site: ${{ inputs.datadog_site }}
           TF_VAR_main_version: ${{ inputs.main_version }}
+          TF_VAR_service_version: ${{ steps.set_service_version.outputs.service_version }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
