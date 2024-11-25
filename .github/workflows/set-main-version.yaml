@@ -1,0 +1,50 @@
+name: Set main version for the application
+
+on:
+  workflow_call:
+    inputs:
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      role_to_assume:
+        description: 'AWS Role to Assume'
+        required: true
+        type: string
+      main_version:
+        description: 'Main version (Blue environment)'
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  set-main-version:
+    runs-on: ubuntu-latest
+    outputs:
+      main_version: ${{ steps.set_main_version.outputs.main_version }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.role_to_assume }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Debug AWS credentials configuration
+        run: |
+          aws sts get-caller-identity
+
+            - name: Set main version
+
+      - name: Set main version
+        id: set_main_version
+        run: |
+          if [ -n "${{ github.event.inputs.main_version }}" ]; then
+            echo "main_version=${{ github.event.inputs.main_version }}" >> "$GITHUB_OUTPUT"
+          else
+            main_version=$(aws ecr describe-images --region ${{ vars.AWS_REGION }} --repository-name "${{ github.event.repository.name }}-repo" --query 'imageDetails[?imageTags && contains(imageTags, `development`)].imageTags' --output json | jq -r '.[][] | select(. != "development")')
+            echo "main_version=${main_version}" >> "$GITHUB_OUTPUT"
+          fi
+
+
