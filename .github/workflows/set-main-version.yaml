@@ -34,9 +34,7 @@ jobs:
       - name: Debug AWS credentials configuration
         run: |
           aws sts get-caller-identity
-
-            - name: Set main version
-
+          
       - name: Set main version
         id: set_main_version
         run: |
