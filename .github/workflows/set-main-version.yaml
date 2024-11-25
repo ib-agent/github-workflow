@@ -34,7 +34,7 @@ jobs:
       - name: Debug AWS credentials configuration
         run: |
           aws sts get-caller-identity
-          
+
       - name: Set main version
         id: set_main_version
         run: |
@@ -43,6 +43,7 @@ jobs:
           else
             main_version=$(aws ecr describe-images --region ${{ vars.AWS_REGION }} --repository-name "${{ github.event.repository.name }}-repo" --query 'imageDetails[?imageTags && contains(imageTags, `development`)].imageTags' --output json | jq -r '.[][] | select(. != "development")')
             echo "main_version=${main_version}" >> "$GITHUB_OUTPUT"
+            echo "main_version=${main_version}"
           fi
 
 
