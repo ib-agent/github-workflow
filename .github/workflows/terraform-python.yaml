@@ -81,6 +81,7 @@ jobs:
         id: set_service_version
         run: | 
           echo "TF_VAR_service_version=$(echo '${{ inputs.service_version }}' | jq -c .)" >> $GITHUB_ENV
+          echo "service_version=${TF_VAR_service_version}"
           echo "service_version=${TF_VAR_service_version}" >> $GITHUB_OUTPUT
 
       - name: Terraform Plan
