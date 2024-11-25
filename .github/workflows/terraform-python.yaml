@@ -87,7 +87,7 @@ jobs:
       - name: Terraform Plan
         working-directory: ./tf
         id: plan
-        run: terraform plan -detailed-exitcode -out=plan.tfplan
+        run: terraform plan -detailed-exitcode -out=plan.tfplan -var="service_version=${{ steps.set_service_version.outputs.service_version }}"
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
