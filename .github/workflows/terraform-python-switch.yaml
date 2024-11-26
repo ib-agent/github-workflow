@@ -94,6 +94,8 @@ jobs:
         run: |
           service_version='${{ inputs.service_version }}'
           echo "service_version = $service_version" > dev.tfvars
+          cat dev.tfvars
+          echo ${{ inputs.main_version }}
 
       - name: View the dev.tfvars file
         working-directory: ./tf
