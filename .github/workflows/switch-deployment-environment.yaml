@@ -1,8 +1,8 @@
-name: Terraform
+name: Switch Deployment Environment
 
-on:
+on: 
   workflow_call:
-    inputs:
+   inputs:
       project_name:
         description: 'The GitHub repository name'
         required: true
@@ -15,16 +15,20 @@ on:
         description: 'AWS Region'
         required: true
         type: string
-      role_to_assume:
-        description: 'AWS Role to Assume'
-        required: true
-        type: string
       datadog_site:
         description: 'Datadog site to send to'
         required: true
         type: string
+      role_to_assume:
+        description: 'AWS Role to Assume'
+        required: true
+        type: string
       environment:
         description: 'environment, used in dd tags'
+        required: true
+        type: string
+      environment_switch_approval:
+        description: 'environment, used in terraform switch environment with approval'
         required: true
         type: string
       main_version:
@@ -41,7 +45,8 @@ permissions:
   contents: read
 
 jobs:
-  terraform:
+  switch_deployment_environment:
+    environment: ${{ inputs.environment_switch_approval }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -65,7 +70,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.7
-
+      
       - name: Set up GitHub authentication for Terraform modules
         run: |
           git config --global url."https://$GITHUB_TOKEN:@github.com/".insteadOf "https://github.com/"
