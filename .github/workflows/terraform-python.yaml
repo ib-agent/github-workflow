@@ -113,7 +113,7 @@ jobs:
       - name: Terraform Apply
         working-directory: ./tf
         if: steps.plan.outputs.exitcode == '2'
-        run: terraform apply -auto-approve plan.tfplan -var-file=terraforn.tfvars
+        run: terraform apply -auto-approve plan.tfplan -var-file=terraform.tfvars
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
