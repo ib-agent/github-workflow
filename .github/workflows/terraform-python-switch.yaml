@@ -86,7 +86,7 @@ jobs:
         working-directory: ./tf
         run: |
           service_version=${{ inputs.service_version }}
-          echo "service_version = $service_version" > switch.tfvars
+          echo "service_version = $service_version" > service_version.tfvars
           cat service_version.tfvars
           echo ${{ inputs.main_version }}
 
