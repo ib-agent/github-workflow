@@ -88,16 +88,16 @@ jobs:
         working-directory: ./tf
         run: |
           service_version='${{ inputs.service_version }}'
-          echo "service_version = $service_version" > dev.tfvars
+          echo "service_version = $service_version" > terraform.tfvars
 
-      - name: View the dev.tfvars file
+      - name: View the terraform.tfvars file
         working-directory: ./tf
-        run: cat dev.tfvars
+        run: cat terraform.tfvars
 
       - name: Terraform Plan
         working-directory: ./tf
         id: plan
-        run: terraform plan -detailed-exitcode -out=plan.tfplan -var-file=dev.tfvars
+        run: terraform plan -detailed-exitcode -out=plan.tfplan -var-file=terraform.tfvars
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
@@ -113,7 +113,7 @@ jobs:
       - name: Terraform Apply
         working-directory: ./tf
         if: steps.plan.outputs.exitcode == '2'
-        run: terraform apply -auto-approve -var-file=dev.tfvars
+        run: terraform apply -auto-approve plan.tfplan -var-file=terraforn.tfvars
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
