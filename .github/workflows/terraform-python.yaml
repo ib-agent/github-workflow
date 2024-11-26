@@ -98,8 +98,8 @@ jobs:
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
-          TF_VAR_org_aws_region: ${{ inputs.org_aws_region }}
-          TF_VAR_org_aws_account_id: ${{ inputs.org_aws_account_id }}
+          TF_VAR_org_aws_region: ${{ vars.AWS_REGION }}
+          TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
           TF_VAR_project_name: ${{ inputs.project_name }}
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
@@ -114,8 +114,8 @@ jobs:
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
-          TF_VAR_org_aws_region: ${{ inputs.org_aws_region }}
-          TF_VAR_org_aws_account_id: ${{ inputs.org_aws_account_id }}
+          TF_VAR_org_aws_region: ${{ vars.AWS_REGION }}
+          TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
           TF_VAR_project_name: ${{ inputs.project_name }}
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
