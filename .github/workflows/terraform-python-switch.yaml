@@ -82,18 +82,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Set the service_version variable
-        id: set_service_version
-        run: | 
-          echo "TF_VAR_service_version=$(echo '${{ inputs.service_version }}' | jq -c .)" >> $GITHUB_ENV
-          echo "service_version=${TF_VAR_service_version}"
-          echo "service_version=${TF_VAR_service_version}" >> $GITHUB_OUTPUT
-
       - name: Create dev.tfvars with service_version value
         working-directory: ./tf
         run: |
-          service_version='${{ inputs.service_version }}'
-          echo "service_version = $service_version" > dev.tfvars
+          service_version=${{ inputs.service_version }}
+          echo "service_version=$service_version" > dev.tfvars
           cat dev.tfvars
           echo ${{ inputs.main_version }}
 
