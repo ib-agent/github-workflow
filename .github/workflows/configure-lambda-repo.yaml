@@ -170,5 +170,5 @@ jobs:
         run: |
           echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
           gh variable set AWS_ACCOUNT_ID --repo ${{ github.repository }} --env=production --body="${{ inputs.aws_account_id_prod }}"
-          gh variable set DD_API_KEY_SECRET_ARN --repo ${{ github.repository }} --env=development --body="${{ inputs.dd_api_key_secret_arn_prod }}"
+          gh variable set DD_API_KEY_SECRET_ARN --repo ${{ github.repository }} --env=production --body="${{ inputs.dd_api_key_secret_arn_prod }}"
           gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=production --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_prod }}:role/${{ github.event.inputs.project_name }}-GitHubActionsRole"
