@@ -85,9 +85,9 @@ jobs:
       - name: Create service_version.tfvars with service_version value
         working-directory: ./tf
         run: |
-          service_version=${{ inputs.service_version }}
+          service_version='${{ inputs.service_version }}'
           echo "service_version = $service_version" > service_version.tfvars
-          cat service_version.tfvars
+          cat service_version.tfvars 
           echo ${{ inputs.main_version }}
 
       - name: Terraform Plan
