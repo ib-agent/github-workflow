@@ -84,20 +84,17 @@ jobs:
           echo "service_version=${TF_VAR_service_version}"
           echo "service_version=${TF_VAR_service_version}" >> $GITHUB_OUTPUT
 
-      - name: Create dev.tfvars with service_version value
+      - name: Create service_version.tfvars with service_version value
         working-directory: ./tf
         run: |
           service_version='${{ inputs.service_version }}'
-          echo "service_version = $service_version" > terraform.tfvars
-
-      - name: View the terraform.tfvars file
-        working-directory: ./tf
-        run: cat terraform.tfvars
+          echo "service_version = $service_version" > service_version.tfvars
+          cat service_version.tfvars 
 
       - name: Terraform Plan
         working-directory: ./tf
         id: plan
-        run: terraform plan -detailed-exitcode -out=plan.tfplan -var-file=terraform.tfvars
+        run: terraform plan -detailed-exitcode -out=plan.tfplan -var-file=service_version.tfvars
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
@@ -113,7 +110,7 @@ jobs:
       - name: Terraform Apply
         working-directory: ./tf
         if: steps.plan.outputs.exitcode == '2'
-        run: terraform apply -auto-approve plan.tfplan -var-file=terraform.tfvars
+        run: terraform apply -auto-approve plan.tfplan -var-file=service_version.tfvars
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}

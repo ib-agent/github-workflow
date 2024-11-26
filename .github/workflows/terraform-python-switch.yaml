@@ -82,18 +82,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Create dev.tfvars with service_version value
+      - name: Create service_version.tfvars with service_version value
         working-directory: ./tf
         run: |
           service_version=${{ inputs.service_version }}
           echo "service_version = $service_version" > switch.tfvars
-          cat switch.tfvars
+          cat service_version.tfvars
           echo ${{ inputs.main_version }}
 
       - name: Terraform Plan
         working-directory: ./tf
         id: plan
-        run: terraform plan -detailed-exitcode -out=switch-plan.tfplan -var-file=switch.tfvars
+        run: terraform plan -detailed-exitcode -out=switch-plan.tfplan -var-file=service_version.tfvars
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
@@ -109,7 +109,7 @@ jobs:
       - name: Terraform Apply
         working-directory: ./tf
         if: steps.plan.outputs.exitcode == '2'
-        run: terraform apply -auto-approve -var-file=switch.tfvars switch-plan.tfplan
+        run: terraform apply -auto-approve -var-file=service_version.tfvars switch-plan.tfplan
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
