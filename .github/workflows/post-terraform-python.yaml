@@ -1,0 +1,86 @@
+name: Post Terraform Tests
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
+      project_name:
+        description: 'Project Name'
+        required: true
+        type: string
+      current_version:
+        description: 'Current Version of the service is pointed by the API Gateway'
+        required: true
+        type: string
+      version:
+        description: 'Version of the service to be deployed'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  stabilize:
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Get ECS Cluster Name from SSM
+        id: get_cluster_name
+        run: |
+          CLUSTER_NAME=$(aws ssm get-parameter --name "/common-infrastructure/cabernet_ai_ecs_cluster_id" --query "Parameter.Value" --output text)
+          echo "CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
+
+      - name: Wait for ECS Service to Stabilize
+        id: wait
+        run: |
+          CURRENT_SERVICE_NAME=${{ inputs.project_name }}-service-${{ inputs.current_version }}
+          SERVICE_NAME=${{ inputs.project_name }}-service-${{ inputs.version }}
+          echo "Waiting for ECS service $CURRENT_SERVICE_NAME to stabilize..."
+          aws ecs wait services-stable --cluster ${{ env.CLUSTER_NAME }} --services $CURRENT_SERVICE_NAME
+          echo "Waiting for ECS service $SERVICE_NAME to stabilize..."
+          aws ecs wait services-stable --cluster ${{ env.CLUSTER_NAME }} --services $SERVICE_NAME
+
+
+  post-terraform-tests:
+    needs:
+      - stabilize
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: cd tests && pip install -r requirements_test.txt
+
+      - name: Run Python tests with pytest
+        run: |
+          export PYTHONPATH=.
+          pytest tests/post-deployment
