@@ -58,7 +58,7 @@ jobs:
           --reporter-json-export tests/postman/reports/${{ inputs.environment }}-green-report.json
         
           # Check status codes from report
-          FAILED_REQUESTS=$(jq -r '.run.executions[] | select(.response.code >= 300 or .response.code < 200) | .item.name' newman-results.json)
+          FAILED_REQUESTS=$(jq -r '.run.executions[] | select(.response.code >= 300 or .response.code < 200) | .item.name' tests/postman/reports/${{ inputs.environment }}-green-report.json)
           
           if [ ! -z "$FAILED_REQUESTS" ]; then
             echo "Failed requests found:"
@@ -105,7 +105,7 @@ jobs:
           --reporter-json-export tests/postman/reports/${{ inputs.environment }}-blue-report.json
 
           # Check status codes from report
-          FAILED_REQUESTS=$(jq -r '.run.executions[] | select(.response.code >= 300 or .response.code < 200) | .item.name' newman-results.json)
+          FAILED_REQUESTS=$(jq -r '.run.executions[] | select(.response.code >= 300 or .response.code < 200) | .item.name' tests/postman/reports/${{ inputs.environment }}-blue-report.json)
           
           if [ ! -z "$FAILED_REQUESTS" ]; then
             echo "Failed requests found:"
