@@ -11,15 +11,20 @@ on:
         description: 'Project Name'
         required: true
         type: string
+      deployment:
+        description: 'Name of the deployment environment (blue/green)'
+        required: true
+        type: string
 
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  post-deployment-tests:
+  post-green-deployment-tests:
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
+    if: ${{ inputs.deployment == 'green' }}
 
     steps:
       - name: Checkout code
@@ -44,9 +49,44 @@ jobs:
           TOKEN=$(./tests/getToken.sh)
           echo "TOKEN=$TOKEN" >> $GITHUB_ENV
 
-      - name: Run Postman tests
+      - name: Run Postman tests on green deployment
         run: |
-          newman run tests/postman/${{ inputs.project_name }}.postman_collection.json \
+          newman run tests/postman/${{ inputs.project_name }}-green.postman_collection.json \
+          -e tests/postman/${{ inputs.environment }}.postman_environment.json \
+          --env-var "bearer_token=${{ env.TOKEN }}" \
+          --bail
+
+  post-blue-deployment-tests:
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    if: ${{ inputs.deployment == 'blue' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Newman
+        run: npm install -g newman
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Retrieve Cognito Token
+        run: |
+          TOKEN=$(./tests/getToken.sh)
+          echo "TOKEN=$TOKEN" >> $GITHUB_ENV
+
+      - name: Run Postman tests on blue deployment
+        run: |
+          newman run tests/postman/${{ inputs.project_name }}-blue.postman_collection.json \
           -e tests/postman/${{ inputs.environment }}.postman_environment.json \
           --env-var "bearer_token=${{ env.TOKEN }}" \
           --bail
