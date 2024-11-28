@@ -54,15 +54,15 @@ jobs:
 
       - name: Get invoke url of API Gateway 
         run: |
-          INVOKE_URL="https://${{ inputs.api_id }}.execute-api.${{ inputs.aws_region }}.amazonaws.com"
-          echo "INVOKE_URL=$INVOKE_URL" >> $GITHUB_ENV
+          INVOKE_HOST="${{ inputs.api_id }}.execute-api.${{ inputs.aws_region }}.amazonaws.com"
+          echo "INVOKE_HOST=$INVOKE_HOST" >> $GITHUB_ENV
         
       - name: Run Postman tests on green deployment
         run: |
           newman run tests/postman/${{ inputs.project_name }}.postman_collection.json \
           -e tests/postman/${{ inputs.environment }}.postman_environment.json \
           --env-var "bearer_token=${{ env.TOKEN }}" \
-          --env-var "host=${{ env.INVOKE_URL }}" \
+          --env-var "host=${{ env.INVOKE_HOST }}" \
           -r cli,json \
           --reporter-json-export tests/postman/reports/${{ inputs.environment }}-report.json
         
