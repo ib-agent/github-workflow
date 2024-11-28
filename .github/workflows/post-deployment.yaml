@@ -61,7 +61,6 @@ jobs:
         run: |
           newman run tests/postman/${{ inputs.project_name }}.postman_collection.json \
           -e tests/postman/${{ inputs.environment }}.postman_environment.json \
-          --env-var "bearer_token=${{ env.TOKEN }}" \
           --env-var "host=${{ env.INVOKE_HOST }}" \
           -r cli,json \
           --reporter-json-export tests/postman/reports/${{ inputs.environment }}-report.json
