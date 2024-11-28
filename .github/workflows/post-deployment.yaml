@@ -53,7 +53,7 @@ jobs:
           echo "TOKEN=$TOKEN" >> $GITHUB_ENV
 
       - name: Get invoke url of API Gateway 
-        run: 
+        run: |
           INVOKE_URL="https://${{ inputs.api_id }}.execute-api.${{ inputs.aws_region }}.amazonaws.com"
           echo "INVOKE_URL=$INVOKE_URL" >> $GITHUB_ENV
         
