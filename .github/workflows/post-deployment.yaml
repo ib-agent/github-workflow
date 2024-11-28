@@ -51,8 +51,8 @@ jobs:
 
       - name: Run Postman tests on green deployment
         run: |
-          newman run tests/postman/${{ inputs.project_name }}-green.postman_collection.json \
-          -e tests/postman/${{ inputs.environment }}.postman_environment.json \
+          newman run tests/postman/${{ inputs.project_name }}.postman_collection.json \
+          -e tests/postman/${{ inputs.environment }}-green.postman_environment.json \
           --env-var "bearer_token=${{ env.TOKEN }}" \
           --bail
 
@@ -86,7 +86,7 @@ jobs:
 
       - name: Run Postman tests on blue deployment
         run: |
-          newman run tests/postman/${{ inputs.project_name }}-blue.postman_collection.json \
-          -e tests/postman/${{ inputs.environment }}.postman_environment.json \
+          newman run tests/postman/${{ inputs.project_name }}.postman_collection.json \
+          -e tests/postman/${{ inputs.environment }}-blue.postman_environment.json \
           --env-var "bearer_token=${{ env.TOKEN }}" \
           --bail
