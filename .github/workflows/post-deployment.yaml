@@ -7,12 +7,16 @@ on:
         description: 'Environment'
         required: true
         type: string
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
       project_name:
         description: 'Project Name'
         required: true
         type: string
-      deployment:
-        description: 'Name of the deployment environment (blue/green)'
+      api_id :
+        description: 'API ID of the  API Gateway'
         required: true
         type: string
 
@@ -21,10 +25,9 @@ permissions:
   contents: read
 
 jobs:
-  post-green-deployment-tests:
+  post-deployment-tests:
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
-    if: ${{ inputs.deployment == 'green' }}
 
     steps:
       - name: Checkout code
@@ -49,63 +52,22 @@ jobs:
           TOKEN=$(./tests/getToken.sh)
           echo "TOKEN=$TOKEN" >> $GITHUB_ENV
 
+      - name: Get invoke url of API Gateway 
+        run: 
+          INVOKE_URL=https://${{ inputs.api_id }}.execute-api.${{ inputs.aws_region }}.amazonaws.com
+          echo "INVOKE_URL=$INVOKE_URL" >> $GITHUB_ENV
+        
       - name: Run Postman tests on green deployment
         run: |
           newman run tests/postman/${{ inputs.project_name }}.postman_collection.json \
-          -e tests/postman/${{ inputs.environment }}-green.postman_environment.json \
+          -e tests/postman/${{ inputs.environment }}.postman_environment.json \
           --env-var "bearer_token=${{ env.TOKEN }}" \
+          --env-var "host=${{ env.INVOKE_URL }}" \
           -r cli,json \
-          --reporter-json-export tests/postman/reports/${{ inputs.environment }}-green-report.json
+          --reporter-json-export tests/postman/reports/${{ inputs.environment }}-report.json
         
           # Check status codes from report
-          FAILED_REQUESTS=$(jq -r '.run.executions[] | select(.response.code >= 300 or .response.code < 200) | .item.name' tests/postman/reports/${{ inputs.environment }}-green-report.json)
-          
-          if [ ! -z "$FAILED_REQUESTS" ]; then
-            echo "Failed requests found:"
-            echo "$FAILED_REQUESTS"
-            exit 1
-          else
-            echo "All requests passed with 2xx status codes"
-          fi
-
-  post-blue-deployment-tests:
-    environment: ${{ inputs.environment }}
-    runs-on: ubuntu-latest
-    if: ${{ inputs.deployment == 'blue' }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Newman
-        run: npm install -g newman
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
-          aws-region: ${{ vars.AWS_REGION }}
-
-      - name: Retrieve Cognito Token
-        run: |
-          TOKEN=$(./tests/getToken.sh)
-          echo "TOKEN=$TOKEN" >> $GITHUB_ENV
-
-      - name: Run Postman tests on blue deployment
-        run: |
-          newman run tests/postman/${{ inputs.project_name }}.postman_collection.json \
-          -e tests/postman/${{ inputs.environment }}-blue.postman_environment.json \
-          --env-var "bearer_token=${{ env.TOKEN }}" \
-          -r cli,json \
-          --reporter-json-export tests/postman/reports/${{ inputs.environment }}-blue-report.json
-
-          # Check status codes from report
-          FAILED_REQUESTS=$(jq -r '.run.executions[] | select(.response.code >= 300 or .response.code < 200) | .item.name' tests/postman/reports/${{ inputs.environment }}-blue-report.json)
+          FAILED_REQUESTS=$(jq -r '.run.executions[] | select(.response.code >= 300 or .response.code < 200) | .item.name' tests/postman/reports/${{ inputs.environment }}-report.json)
           
           if [ ! -z "$FAILED_REQUESTS" ]; then
             echo "Failed requests found:"
