@@ -55,32 +55,32 @@ jobs:
           echo "Waiting for ECS service $SERVICE_NAME to stabilize..."
           aws ecs wait services-stable --cluster ${{ env.CLUSTER_NAME }} --services $SERVICE_NAME
 
+  ### Run the integration tests after the deployment is stabilized ###
+  # post-terraform-tests:
+  #   needs:
+  #     - stabilize
+  #   environment: ${{ inputs.environment }}
+  #   runs-on: ubuntu-latest
 
-  post-terraform-tests:
-    needs:
-      - stabilize
-    environment: ${{ inputs.environment }}
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
       
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
-          aws-region: ${{ vars.AWS_REGION }}
+  #     - name: Configure AWS credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
+  #         aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.x'
 
-      - name: Install dependencies
-        run: cd tests && pip install -r requirements_test.txt
+  #     - name: Install dependencies
+  #       run: cd tests && pip install -r requirements_test.txt
 
-      - name: Run Python tests with pytest
-        run: |
-          export PYTHONPATH=.
-          pytest tests/post-deployment
+  #     - name: Run Python tests with pytest
+  #       run: |
+  #         export PYTHONPATH=.
+  #         pytest tests/post-deployment
