@@ -20,7 +20,9 @@ on:
         required: true
         type: string
     outputs:
-      validation_passed: ${{ jobs.post-deployment-tests.outputs.validation_passed }}
+      validation_passed: 
+        description: 'Whether post deployment tests passed'
+        value: ${{ jobs.post-deployment-tests.outputs.validation_passed }}
 
 permissions:
   id-token: write
