@@ -62,7 +62,7 @@ jobs:
           INVOKE_HOST="${{ inputs.api_id }}.execute-api.${{ inputs.aws_region }}.amazonaws.com"
           echo "INVOKE_HOST=$INVOKE_HOST" >> $GITHUB_ENV
         
-      - name: Run Postman tests on green deployment
+      - name: Run Postman tests
         id: run_postman_tests
         run: |
           newman run tests/postman/${{ inputs.project_name }}.postman_collection.json \
