@@ -27,7 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       ecr_tag: ${{ steps.get_ecr_tag.outputs.ecr_tag }}
-      validation_passed: ${{ steps.validate_version.outputs.validation_passed }}
+      validation_dev_passed: ${{ steps.validate_version_dev.outputs.validation_passed }}
+      validation_prod_passed: ${{ steps.validate_version_prod.outputs.validation_passed }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
