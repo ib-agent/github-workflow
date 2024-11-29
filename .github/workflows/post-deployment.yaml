@@ -19,6 +19,8 @@ on:
         description: 'API ID of the  API Gateway'
         required: true
         type: string
+    outputs:
+      validation_passed: ${{ jobs.post-deployment-tests.outputs.validation_passed }}
 
 permissions:
   id-token: write
@@ -28,7 +30,8 @@ jobs:
   post-deployment-tests:
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
-
+    outputs:
+      validation_passed: ${{ steps.run_postman_tests.outputs.validation_passed }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -58,6 +61,7 @@ jobs:
           echo "INVOKE_HOST=$INVOKE_HOST" >> $GITHUB_ENV
         
       - name: Run Postman tests on green deployment
+        id: run_postman_tests
         run: |
           newman run tests/postman/${{ inputs.project_name }}.postman_collection.json \
           -e tests/postman/${{ inputs.environment }}.postman_environment.json \
@@ -72,7 +76,9 @@ jobs:
           if [ ! -z "$FAILED_REQUESTS" ]; then
             echo "Failed requests found:"
             echo "$FAILED_REQUESTS"
+            echo "validation_passed=false" >> $GITHUB_OUTPUT
             exit 1
           else
             echo "All requests passed with 2xx status codes"
+            echo "validation_passed=true" >> $GITHUB_OUTPUT
           fi
