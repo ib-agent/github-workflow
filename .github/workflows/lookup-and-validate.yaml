@@ -27,8 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       ecr_tag: ${{ steps.get_ecr_tag.outputs.ecr_tag }}
-      validation_dev_passed: ${{ steps.validate_version_dev.outputs.validation_passed }}
-      validation_prod_passed: ${{ steps.validate_version_prod.outputs.validation_passed }}
+      validation_dev_passed: ${{ steps.validate_version_dev.outputs.validation_dev_passed }}
+      validation_prod_passed: ${{ steps.validate_version_prod.outputs.validation_prod_passed }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -86,7 +86,7 @@ jobs:
             echo "Error: Only 7-character commit SHAs version are allowed for development deployments. Found version: ${{ env.ECR_TAG }}"
             exit 1
           fi
-          echo "validation_passed=true" >> $GITHUB_OUTPUT
+          echo "validation_dev_passed=true" >> $GITHUB_OUTPUT
 
       - name: Validate Version for Production
         id: validate_version_prod
@@ -96,4 +96,4 @@ jobs:
             echo "Error: Only semantic versioning is allowed for production deployments. Found version: ${{ env.ECR_TAG }}"
             exit 1
           fi
-          echo "validation_passed=true" >> $GITHUB_OUTPUT
+          echo "validation_prod_passed=true" >> $GITHUB_OUTPUT
