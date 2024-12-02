@@ -88,31 +88,15 @@ jobs:
       - name: Get ECR Tag
         id: get_ecr_tag
         run: |
-          # Check if repository exists
-          if ! aws ecr describe-repositories --repository-names ${{ inputs.project_name }}-repo >/dev/null 2>&1; then
-            echo "Error: ECR repository ${{ inputs.project_name }}-repo not found"
-            exit 1
-          fi
-          
-          # Get matching image tag
-          ECR_TAG=$(aws ecr describe-images \
-            --repository-name ${{ inputs.project_name }}-repo \
-            --query 'sort_by(imageDetails,& imagePushedAt)[*].{imageTag:imageTags[0]}' \
-            --output text | grep "$TAG" || true)
-          
+          ECR_TAG=$(aws ecr describe-images --repository-name ${{ inputs.project_name }}-repo \
+                    --query 'sort_by(imageDetails,& imagePushedAt)[*].{imageTag:imageTags[0]}' \
+                    --output text | grep $TAG | head -n 1)
           if [ -z "$ECR_TAG" ]; then
-            echo "Error: No ECR image found with tag: $TAG"
-            echo "Available tags:"
-            aws ecr describe-images \
-              --repository-name ${{ inputs.project_name }}-repo \
-              --query 'sort_by(imageDetails,& imagePushedAt)[*].{imageTag:imageTags[0]}' \
-              --output text
+            echo "Error: Could not find ECR tag for ${{ inputs.project_name }}-repo:$TAG"
             exit 1
           fi
-          
-          echo "Found ECR tag: $ECR_TAG"
           echo "ECR_TAG=$ECR_TAG" >> $GITHUB_ENV
-          echo "ecr_tag=$ECR_TAG" >> $GITHUB_OUTPUT 
+          echo "ECR_TAG=$ECR_TAG" >> $GITHUB_OUTPUT
 
       - name: Validate Version for Development
         id: validate_version_dev
