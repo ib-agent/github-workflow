@@ -53,8 +53,14 @@ jobs:
         id: extract_tag_dev
         if: ${{ inputs.environment == 'development' }}
         run: |
-          SHORT_SHA=$(git rev-parse --short=7 ${{ inputs.ref }})
-    
+          # Try to get SHA from ref
+          if ! SHORT_SHA=$(git rev-parse --short=7 "${{ inputs.ref }}" 2>/dev/null); then
+            echo "Could not resolve ${{ inputs.ref }} as commit hash, assign it as ECR image tag"
+            echo "TAG=$TAG" >> $GITHUB_ENV
+            echo "TAG=$TAG" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
           # Validate format
           if [[ $SHORT_SHA =~ ^[0-9a-f]{7}$ ]]; then
             TAG=$SHORT_SHA
@@ -62,9 +68,9 @@ jobs:
             echo "TAG=$TAG" >> $GITHUB_OUTPUT
             echo "Using commit SHA: $TAG"
           else
-            echo "Error: Could not extract valid 7-character commit hash"
+            echo "Error: Invalid commit hash format: $SHORT_SHA"
             exit 1
-          fi
+          fi 
 
       - name: Extract tag from ref for production
         id: extract_tag_prod
