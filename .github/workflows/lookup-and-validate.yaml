@@ -88,11 +88,34 @@ jobs:
       - name: Get ECR Tag
         id: get_ecr_tag
         run: |
-          ECR_TAG=$(aws ecr describe-images --repository-name ${{ inputs.project_name }}-repo \
-                    --query 'sort_by(imageDetails,& imagePushedAt)[*].{imageTag:imageTags[0]}' \
-                    --output text | grep $TAG | head -n 1)
+          # First ensure TAG is set
+          if [ -z "$TAG" ]; then
+            echo "Error: TAG variable is not set"
+            exit 1
+          fi
+          
+          # Get all image tags
+          IMAGES=$(aws ecr describe-images \
+            --repository-name ${{ inputs.project_name }}-repo \
+            --query 'sort_by(imageDetails,& imagePushedAt)[*].imageTags[0]' \
+            --output text || echo "")
+            
+          if [ -z "$IMAGES" ]; then
+            echo "Error: No images found in repository"
+            exit 1
+          fi
+          
+          # Find matching tag
+          ECR_TAG=$(echo "$IMAGES" | grep -w "$TAG" || echo "")
+          
+          if [ -z "$ECR_TAG" ]; then
+            echo "Error: No matching tag found for $TAG"
+            exit 1
+          fi
+          
+          echo "Found ECR tag: $ECR_TAG"
           echo "ECR_TAG=$ECR_TAG" >> $GITHUB_ENV
-          echo "ECR_TAG=$ECR_TAG" >> $GITHUB_OUTPUT
+          echo "ecr_tag=$ECR_TAG" >> $GITHUB_OUTPUT 
 
       - name: Validate Version for Development
         id: validate_version_dev
