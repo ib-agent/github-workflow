@@ -56,16 +56,16 @@ jobs:
           # Try to get SHA from ref
           if ! SHORT_SHA=$(git rev-parse --short=7 "${{ inputs.ref }}" 2>/dev/null); then
             echo "Could not resolve ${{ inputs.ref }} as commit hash, assign it as ECR image tag"
-            echo "TAG=$TAG" >> $GITHUB_ENV
-            echo "TAG=$TAG" >> $GITHUB_OUTPUT
+            echo "TAG=${{ inputs.ref }}" >> $GITHUB_ENV
+            echo "TAG=$${{ inputs.ref }}" >> $GITHUB_OUTPUT
             exit 0
           fi
 
           # Validate format
           if [[ $SHORT_SHA =~ ^[0-9a-f]{7}$ ]]; then
             TAG=$SHORT_SHA
-            echo "TAG=${{ inputs.ref }}" >> $GITHUB_ENV
-            echo "TAG=${{ inputs.ref }}" >> $GITHUB_OUTPUT
+            echo "TAG=$TAG" >> $GITHUB_ENV
+            echo "TAG=$TAG" >> $GITHUB_OUTPUT
             echo "Using commit SHA: $TAG"
           else
             echo "Error: Invalid commit hash format: $SHORT_SHA"
