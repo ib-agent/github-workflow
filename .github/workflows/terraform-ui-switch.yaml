@@ -23,14 +23,6 @@ on:
         description: 'environment, used in terraform switch environment with approval'
         required: true
         type: string
-      main_version:
-        description: 'Main version (Blue environment)'
-        required: true
-        type: string
-      ui_version:
-        description: 'UI version list of application'
-        required: true
-        type: string
 
 permissions:
   id-token: write
