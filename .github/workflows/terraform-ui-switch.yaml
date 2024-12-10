@@ -97,3 +97,10 @@ jobs:
               echo "No staging distribution found to promote"
               exit 1
           fi
+      
+      - name: Wait for distribution to be deployed
+        id: wait_for_distribution
+        run: |
+          primary_id=${{ steps.promote_staging_to_production.outputs.primary_id }}
+          aws cloudfront wait distribution-deployed --id $primary_id
+          echo "Distribution deployed: $primary_id"
