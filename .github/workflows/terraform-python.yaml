@@ -19,20 +19,20 @@ on:
         description: 'AWS Role to Assume'
         required: true
         type: string
-      dd_site:
+      datadog_site:
         description: 'Datadog site to send to'
-        required: true
-        type: string
-      docker_image:
-        description: 'full url to the docker image'
         required: true
         type: string
       environment:
         description: 'environment, used in dd tags'
         required: true
         type: string
+      main_version:
+        description: 'Main version (Blue environment)'
+        required: true
+        type: string
       service_version:
-        description: 'version, used in dd tags'
+        description: 'Service version list of application'
         required: true
         type: string
 
@@ -77,36 +77,42 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
+      - name: Create service_version.tfvars with service_version value
+        working-directory: ./tf
+        run: |
+          service_version='${{ inputs.service_version }}'
+          echo "service_version = $service_version" > service_version.tfvars
+          cat service_version.tfvars 
+          echo ${{ inputs.main_version }}
+
       - name: Terraform Plan
         working-directory: ./tf
         id: plan
-        run: terraform plan -detailed-exitcode -out=plan.tfplan
+        run: terraform plan -detailed-exitcode -out=plan.tfplan -var-file=service_version.tfvars
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
           TF_VAR_org_aws_region: ${{ vars.AWS_REGION }}
           TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
-          TF_VAR_docker_image: ${{ inputs.docker_image }}
           TF_VAR_project_name: ${{ inputs.project_name }}
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
-          TF_VAR_datadog_site: ${{ inputs.dd_site }}
-          TF_VAR_service_version: ${{ inputs.service_version }}
+          TF_VAR_datadog_site: ${{ inputs.datadog_site }}
+          TF_VAR_main_version: ${{ inputs.main_version }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Apply
         working-directory: ./tf
         if: steps.plan.outputs.exitcode == '2'
-        run: terraform apply -auto-approve plan.tfplan
+        run: terraform apply -auto-approve plan.tfplan 
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
           TF_VAR_org_aws_region: ${{ vars.AWS_REGION }}
           TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
-          TF_VAR_docker_image: ${{ inputs.docker_image }}
           TF_VAR_project_name: ${{ inputs.project_name }}
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
-          TF_VAR_datadog_site: ${{ inputs.dd_site }}
-          TF_VAR_service_version: ${{ inputs.service_version }}
+          TF_VAR_datadog_site: ${{ inputs.datadog_site }}
+          TF_VAR_main_version: ${{ inputs.main_version }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
