@@ -57,48 +57,51 @@ jobs:
         run: |
           aws sts get-caller-identity
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.7
-      
-      - name: Set up GitHub authentication for Terraform modules
+      - name: Promote staging distribution to production
+        id: promote_staging_to_production
         run: |
-          git config --global url."https://$GITHUB_TOKEN:@github.com/".insteadOf "https://github.com/"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          # Get distribution IDs
+          distribution_ids=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Origins.Items[0].DomainName, '${{ inputs.github_repository }}')].Id" \
+            --output json)
 
-      - name: Terraform Init
-        run: ./terraform-init.sh ${{ inputs.aws_account_id }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          # Convert to array
+          distribution_ids=$(echo $distribution_ids | jq -r '.[]')
 
-      - name: Create ui_version.tfvars with ui_version value
-        working-directory: ./tf
-        run: |
-          ui_version='${{ inputs.ui_version }}'
-          echo "ui_version = $ui_version" > ui_version.tfvars
-          cat ui_version.tfvars 
-          echo ${{ inputs.main_version }}
+          # Initialize variables
+          primary_id=""
+          staging_id=""
+          primary_etag=""
+          staging_etag=""
 
-      - name: Terraform Plan
-        working-directory: ./tf
-        id: plan
-        run: terraform plan -detailed-exitcode -out=switch-plan.tfplan -var-file=ui_version.tfvars
-        env:
-          TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
-          TF_VAR_region: ${{ inputs.aws_region }}
-          TF_VAR_github_repository: ${{ inputs.github_repository }}
-          TF_VAR_main_version: ${{ inputs.main_version }} 
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          # Process each distribution
+          for distribution_id in $distribution_ids; do
+              config=$(aws cloudfront get-distribution-config --id $distribution_id)
+              etag=$(echo $config | jq -r '.ETag')
+              is_staging=$(echo $config | jq -r '.DistributionConfig.Staging')
+              
+              if [ "$is_staging" = "true" ]; then
+                  staging_id=$distribution_id
+                  staging_etag=$etag
+                  echo "Found staging distribution: $staging_id"
+              else
+                  primary_id=$distribution_id
+                  primary_etag=$etag
+                  echo "Found primary distribution: $primary_id"
+              fi
+          done
 
-      - name: Terraform Apply
-        working-directory: ./tf
-        if: steps.plan.outputs.exitcode == '2'
-        run: terraform apply -auto-approve switch-plan.tfplan
-        env:
-          TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
-          TF_VAR_region: ${{ inputs.aws_region }}
-          TF_VAR_github_repository: ${{ inputs.github_repository }}
-          TF_VAR_main_version: ${{ inputs.main_version }} 
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          # Promote if both exist
+          if [ -n "$staging_id" ] && [ -n "$primary_id" ]; then
+              echo "Promoting staging distribution to primary..."
+              aws cloudfront update-distribution-with-staging-config \
+                  --id $primary_id \
+                  --staging-distribution-id $staging_id \
+                  --if-match $primary_etag,$staging_etag
+              
+              echo "primary_id=$primary_id" >> $GITHUB_OUTPUT
+              echo "staging_id=$staging_id" >> $GITHUB_OUTPUT
+          else
+              echo "No staging distribution found to promote"
+              exit 1
+          fi
