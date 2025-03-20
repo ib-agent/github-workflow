@@ -101,6 +101,29 @@ jobs:
               --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
           fi
 
+      - name: Set up Cross-Account Access
+        if: ${{ matrix.environment == 'development' }}
+        working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
+        env:
+          PROJECT_NAME: ${{ inputs.project_name }}
+          AWS_REGION: ${{ steps.set_env.outputs.aws_region }}
+          AWS_ACCOUNT_ID_PROD: ${{ inputs.aws_account_id_prod }}
+        run: |
+          policy_file="CodeArtifactCrossAccountAccess.json"
+          # Define your CodeArtifact domain name 
+          domain_name="cabernetai"
+
+          echo "[INFO] Replacing prod account id in CodeArtifact cross account access policy"
+          find . -type f -name $policy_file -exec sed -i 's/\${AWS_ACCOUNT_ID}/'"$AWS_ACCOUNT_ID_PROD"'/g' {} \;
+
+          echo "[INFO] Attaching CodeArtifact Domain Permissions Policy for prod account: $AWS_ACCOUNT_ID_PROD"
+          aws codeartifact put-domain-permissions-policy \
+            --domain "$domain_name" \
+            --domain-owner "$(aws sts get-caller-identity --query Account --output text)" \
+            --policy-document file://$policy_file \
+            --region "$AWS_REGION"
+            
+
       - name: Replace value for default policy files 
         working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
         env:
