@@ -21,13 +21,28 @@ on:
       ref:
         type: string
         required: true
+    outputs:
+      ecr_tag:
+        description: "ECR Tag for the deployment"
+        value: ${{ jobs.lookup_and_validate.outputs.ecr_tag }}
+      validation_dev_passed:
+        description: "Whether development validation passed"
+        value: ${{ jobs.lookup_and_validate.outputs.validation_dev_passed }}
+      validation_prod_passed:
+        description: "Whether production validation passed"
+        value: ${{ jobs.lookup_and_validate.outputs.validation_prod_passed }}
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   lookup_and_validate:
     runs-on: ubuntu-latest
     outputs:
       ecr_tag: ${{ steps.get_ecr_tag.outputs.ecr_tag }}
-      validation_passed: ${{ steps.validate_version.outputs.validation_passed }}
+      validation_dev_passed: ${{ steps.validate_version_dev.outputs.validation_dev_passed }}
+      validation_prod_passed: ${{ steps.validate_version_prod.outputs.validation_prod_passed }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,9 +52,33 @@ jobs:
         with:
           role-to-assume: ${{ inputs.role_to_assume }}
           aws-region: ${{ inputs.aws_region }}
+      
+      - name: Extract tag from ref for development
+        id: extract_tag_dev
+        if: ${{ inputs.environment == 'development' }}
+        run: |
+          # Try to get SHA from ref
+          if ! SHORT_SHA=$(git rev-parse --short=7 "${{ inputs.ref }}" 2>/dev/null); then
+            echo "Could not resolve ${{ inputs.ref }} as commit hash, assign it as ECR image tag"
+            echo "TAG=${{ inputs.ref }}" >> $GITHUB_ENV
+            echo "TAG=$${{ inputs.ref }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
-      - name: Extract tag from ref
-        id: extract_tag
+          # Validate format
+          if [[ $SHORT_SHA =~ ^[0-9a-f]{7}$ ]]; then
+            TAG=$SHORT_SHA
+            echo "TAG=$TAG" >> $GITHUB_ENV
+            echo "TAG=$TAG" >> $GITHUB_OUTPUT
+            echo "Using commit SHA: $TAG"
+          else
+            echo "Error: Invalid commit hash format: $SHORT_SHA"
+            exit 1
+          fi 
+
+      - name: Extract tag from ref for production
+        id: extract_tag_prod
+        if: ${{ inputs.environment == 'production' }}
         run: |
           REF=${{ inputs.ref }}
           if [[ "$REF" == refs/tags/* ]]; then
@@ -56,15 +95,30 @@ jobs:
           ECR_TAG=$(aws ecr describe-images --repository-name ${{ inputs.project_name }}-repo \
                     --query 'sort_by(imageDetails,& imagePushedAt)[*].{imageTag:imageTags[0]}' \
                     --output text | grep $TAG | head -n 1)
+          if [ -z "$ECR_TAG" ]; then
+            echo "Error: Could not find ECR tag for ${{ inputs.project_name }}-repo:$TAG"
+            exit 1
+          fi
           echo "ECR_TAG=$ECR_TAG" >> $GITHUB_ENV
           echo "ECR_TAG=$ECR_TAG" >> $GITHUB_OUTPUT
 
+      - name: Validate Version for Development
+        id: validate_version_dev
+        if: ${{ inputs.environment == 'development' }}
+        run: |
+          if ! [[ ${{ env.ECR_TAG }} =~ ^[0-9a-f]{7}$ ]]; then
+            echo "Error: Only 7-character commit SHAs version are allowed for development deployments. Found version: ${{ env.ECR_TAG }}"
+            exit 1
+          fi
+          echo "validation_dev_passed=true" >> $GITHUB_OUTPUT
+
       - name: Validate Version for Production
-        id: validate_version
+        id: validate_version_prod
         if: ${{ inputs.environment == 'production' }}
         run: |
           if ! [[ ${{ env.ECR_TAG }} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Error: Only semantic versioning is allowed for production deployments. Found version: ${{ env.ECR_TAG }}"
             exit 1
           fi
-          echo "validation_passed=true" >> $GITHUB_OUTPUT
+          echo "validation_prod_passed=true" >> $GITHUB_OUTPUT
+
