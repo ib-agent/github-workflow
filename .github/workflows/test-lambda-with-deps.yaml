@@ -12,6 +12,15 @@ on:
         description: 'The GH environment development or production'
         required: true
         type: string
+      aws_account_id:
+        type: string
+        required: true
+      org_aws_account_id:
+        type: string
+        required: true
+      aws_region:
+        type: string
+        required: true
       role_to_assume:
         description: 'the aws role to assume'
         required: false
@@ -54,7 +63,12 @@ jobs:
 
       - name: Authenticate to AWS CodeArtifact
         run: |
-          aws codeartifact login --tool pip --domain cabernetai --repository python
+          aws codeartifact login \
+              --tool pip \
+              --domain cabernetai \
+              --domain-owner ${{ inputs.org_aws_account_id }} \
+              --repository python \
+              --region ${{ inputs.aws_region }} 
 
       - name: Install dependencies
         env:
