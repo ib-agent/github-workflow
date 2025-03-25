@@ -40,5 +40,10 @@ jobs:
         run: |
           git fetch --tags
           LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No tags found. Setting default version 1.0.0"
+            LATEST_TAG="1.0.0"
+          fi
+
           echo "LATEST_TAG=$LATEST_TAG"
           echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
