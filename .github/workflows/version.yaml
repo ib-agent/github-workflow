@@ -39,6 +39,14 @@ jobs:
         id: set-version
         run: |
           git fetch --tags
-          LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+
+          # Check if there are any tags
+          if git tag --list | grep -q .; then
+            LATEST_TAG=$(git describe --tags "$(git rev-list --tags --max-count=1)")
+          else
+            echo "No tags found. Setting default version 1.0.0"
+            LATEST_TAG="1.0.0"
+          fi
+
           echo "LATEST_TAG=$LATEST_TAG"
           echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
