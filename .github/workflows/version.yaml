@@ -10,10 +10,6 @@ on:
 jobs:
   semantic_release:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: write
-      issues: write
     outputs:
       version: ${{ steps.set-version.outputs.version }}
     steps:
@@ -32,6 +28,14 @@ jobs:
         run: |
           npm install semantic-release 
           npm install @semantic-release/commit-analyzer @semantic-release/changelog @semantic-release/git @semantic-release/github
+
+      - name: Remove existing semantic-release notes refs
+        run: |
+          git fetch origin
+          for ref in $(git ls-remote --refs origin | awk '/refs\/notes\/semantic-release/ {print $2}'); do
+            echo "Deleting $ref"
+            git push origin :$ref || true
+          done
 
       - name: Run semantic release
         id: semantic
