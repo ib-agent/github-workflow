@@ -188,7 +188,7 @@ jobs:
           fi
 
       - name: Replace value for default policy files 
-        working-directory: ./${{ inputs.project_name }}/tf/default-policy
+        working-directory: ./services/${{ inputs.project_name }}/tf/default-policy
         env:
           PROJECT_NAME: ${{ inputs.project_name }}
           AWS_ACCOUNT_ID: ${{ steps.set_env.outputs.aws_account_id }} 
