@@ -27,14 +27,6 @@ on:
         required: true
         type: string
         default: 'us-west-2' 
-      org_aws_region:
-        description: 'ORG AWS Region'
-        required: true
-        type: string
-      org_aws_account_id:
-        description: 'ORG AWS Account ID'
-        required: true
-        type: string
       role_to_assume:
         description: 'TF Init Dev Role to Assume'
         type: string
@@ -58,15 +50,11 @@ jobs:
           if [ "${{ matrix.environment }}" == "development" ]; then
             echo "aws_account_id=${{ inputs.aws_account_id_dev }}" >> "$GITHUB_OUTPUT"
             echo "aws_region=${{ inputs.aws_region_dev }}" >> "$GITHUB_OUTPUT"
-            echo "org_aws_region=${{ inputs.org_aws_region }}" >> "$GITHUB_OUTPUT"
-            echo "org_aws_account_id=${{ inputs.org_aws_account_id }}" >> "$GITHUB_OUTPUT"
             role_to_assume="arn:aws:iam::${{ inputs.aws_account_id_dev }}:role/${{ inputs.role_to_assume }}"
             echo "role_to_assume=$role_to_assume" >> "$GITHUB_OUTPUT"
           else
             echo "aws_region=${{ inputs.aws_region_prod }}" >> "$GITHUB_OUTPUT"
             echo "aws_account_id=${{ inputs.aws_account_id_prod }}" >> "$GITHUB_OUTPUT"
-            echo "org_aws_region=${{ inputs.org_aws_region }}" >> "$GITHUB_OUTPUT"
-            echo "org_aws_account_id=${{ inputs.org_aws_account_id }}" >> "$GITHUB_OUTPUT"
             role_to_assume="arn:aws:iam::${{ inputs.aws_account_id_prod }}:role/${{ inputs.role_to_assume }}"
             echo "role_to_assume=$role_to_assume" >> "$GITHUB_OUTPUT"
           fi
@@ -119,19 +107,9 @@ jobs:
           PROJECT_NAME: ${{ inputs.project_name }}
           AWS_ACCOUNT_ID: ${{ steps.set_env.outputs.aws_account_id }} 
           AWS_REGION: ${{ steps.set_env.outputs.aws_region }}
-          ORG_AWS_REGION: ${{ steps.set_env.outputs.org_aws_region }}
-          ORG_AWS_ACCOUNT_ID: ${{ steps.set_env.outputs.org_aws_account_id }}
         run: |
-          echo "[INFO] Replacing placeholders in policy files..."
-          find . -type f -name "*.json" -exec sed -i \
-            -e 's|\${AWS_REGION}|'"$AWS_REGION"'|g' \
-            -e 's|\${AWS_ACCOUNT_ID}|'"$AWS_ACCOUNT_ID"'|g' \
-            -e 's|\${ORG_AWS_REGION}|'"$ORG_AWS_REGION"'|g' \
-            -e 's|\${ORG_AWS_ACCOUNT_ID}|'"$ORG_AWS_ACCOUNT_ID"'|g' \
-            -e 's|\${PROJECT_NAME}|'"$PROJECT_NAME"'|g' \
-            -e 's|\${USER_NAME}|'"$GITHUB_REPOSITORY_OWNER"'|g' \
-            {} +
-
+          echo "[INFO] Replace value for default policy files"
+          find . -type f -name "*.json" -exec sed -i 's/\${AWS_REGION}/'"$AWS_REGION"'/g; s/\${AWS_ACCOUNT_ID}/'"$AWS_ACCOUNT_ID"'/g; s/\${USER_NAME}/'"$GITHUB_REPOSITORY_OWNER"'/g; s/\${PROJECT_NAME}/'"$PROJECT_NAME"'/g' {} \;
           
       - name: Create GitHubActionsRole for project
         working-directory: ./{{ cookiecutter.project_name }}/tf/default-policy
