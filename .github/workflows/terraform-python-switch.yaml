@@ -1,9 +1,9 @@
-name: Terraform
+name: Switch Deployment Environment
 
-on:
+on: 
   workflow_call:
-    inputs:
-      github_repository:
+   inputs:
+      project_name:
         description: 'The GitHub repository name'
         required: true
         type: string
@@ -15,16 +15,28 @@ on:
         description: 'AWS Region'
         required: true
         type: string
+      datadog_site:
+        description: 'Datadog site to send to'
+        required: true
+        type: string
       role_to_assume:
         description: 'AWS Role to Assume'
+        required: true
+        type: string
+      environment:
+        description: 'environment, used in dd tags'
+        required: true
+        type: string
+      environment_switch_approval:
+        description: 'environment, used in terraform switch environment with approval'
         required: true
         type: string
       main_version:
         description: 'Main version (Blue environment)'
         required: true
         type: string
-      ui_version:
-        description: 'UI version list of application'
+      service_version:
+        description: 'Service version list of application'
         required: true
         type: string
 
@@ -33,7 +45,8 @@ permissions:
   contents: read
 
 jobs:
-  terraform:
+  switch_deployment_environment:
+    environment: ${{ inputs.environment_switch_approval }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -57,7 +70,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.7
-
+      
       - name: Set up GitHub authentication for Terraform modules
         run: |
           git config --global url."https://$GITHUB_TOKEN:@github.com/".insteadOf "https://github.com/"
@@ -69,32 +82,42 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Create ui_version.tfvars with ui_version value
+      - name: Create service_version.tfvars with service_version value
         working-directory: ./tf
         run: |
-          ui_version='${{ inputs.ui_version }}'
-          echo "ui_version = $ui_version" > ui_version.tfvars
-          cat ui_version.tfvars 
+          service_version='${{ inputs.service_version }}'
+          echo "service_version = $service_version" > service_version.tfvars
+          cat service_version.tfvars 
           echo ${{ inputs.main_version }}
 
       - name: Terraform Plan
+        working-directory: ./tf
         id: plan
-        run: terraform plan -detailed-exitcode -out=plan.tfplan --var-file=ui_version.tfvars
+        run: terraform plan -detailed-exitcode -out=switch-plan.tfplan -var-file=service_version.tfvars
         env:
+          TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
-          TF_VAR_region: ${{ inputs.aws_region }}
-          TF_VAR_github_repository: ${{ inputs.github_repository }}
-          TF_VAR_github_username: ${{ secrets.WORKFLOW_USERNAME }}
-          TF_VAR_main_version: ${{ inputs.main_version }} 
+          TF_VAR_org_aws_region: ${{ vars.AWS_REGION }}
+          TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
+          TF_VAR_project_name: ${{ inputs.project_name }}
+          TF_VAR_environment: ${{ inputs.environment }}
+          TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
+          TF_VAR_datadog_site: ${{ inputs.datadog_site }}
+          TF_VAR_main_version: ${{ inputs.main_version }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Terraform Apply
+        working-directory: ./tf
         if: steps.plan.outputs.exitcode == '2'
-        run: terraform apply -auto-approve plan.tfplan
+        run: terraform apply -auto-approve switch-plan.tfplan
         env:
+          TF_VAR_aws_region: ${{ inputs.aws_region }}
           TF_VAR_aws_account_id: ${{ inputs.aws_account_id }}
-          TF_VAR_region: ${{ inputs.aws_account_id }}
-          TF_VAR_github_repository: ${{ inputs.github_repository }}
-          TF_VAR_github_username: ${{ secrets.WORKFLOW_USERNAME }}
+          TF_VAR_org_aws_region: ${{ vars.AWS_REGION }}
+          TF_VAR_org_aws_account_id: ${{ vars.ORG_AWS_ACCOUNT_ID }}
+          TF_VAR_project_name: ${{ inputs.project_name }}
+          TF_VAR_environment: ${{ inputs.environment }}
+          TF_VAR_datadog_api_key: ${{ secrets.DATADOG_API_KEY }}
+          TF_VAR_datadog_site: ${{ inputs.datadog_site }}
           TF_VAR_main_version: ${{ inputs.main_version }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
