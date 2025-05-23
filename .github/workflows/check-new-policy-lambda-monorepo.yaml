@@ -89,8 +89,6 @@ jobs:
           ORG_AWS_ACCOUNT_ID: ${{ vars.ORG_AWS_ACCOUNT_ID }}
           WORKING_DIR: ${{ inputs.working_dir }}
         run: |
-          # Get the current date in the format YYYYMMDDHHMMSS with GMT-6 offset
-          timestamp=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
 
           # Get modified policy JSON files in the 'tf/default-policy' 
           modified_default_files=$(git diff --name-only HEAD~1 HEAD | grep "^$WORKING_DIR/tf/default-policy/.*\.json$")
@@ -146,14 +144,15 @@ jobs:
         run: |
           # Get the current date in the format YYYYMMDDHHMMSS with GMT-6 offset
           timestamp=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
+          uuid=$(uuidgen | cut -c1-8)   # Get first 8 chars of UUID
 
           # GitHubActionsRole
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
 
           # Get modified policy JSON files in the 'tf' directory and exclude child directory 
           modified_files=$(git diff --name-only HEAD~1 HEAD | grep "^$WORKING_DIR/tf/[^/]*\.json$")
-          policy_file="temporary-$timestamp.json"
-          policy_name="temporary-$timestamp"
+          policy_file="temporary-${timestamp}-${uuid}.json"
+          policy_name="temporary-${timestamp}-${uuid}"
 
           # Initialize the combined policy structure
           echo '{
