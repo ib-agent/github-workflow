@@ -139,6 +139,7 @@ jobs:
         if: steps.check-modified-files.outputs.modified == 'true' || steps.check-modified-files.outputs.tf-modified == 'true'
         working-directory: ${{ inputs.working_dir }}/tf/
         env:
+          WORKING_DIR: ${{ inputs.working_dir }}
           PROJECT_NAME: ${{ inputs.project_name }}
           AWS_ACCOUNT_ID: ${{ inputs.aws_account_id }}
           AWS_REGION: ${{ vars.AWS_REGION }}
@@ -148,6 +149,7 @@ jobs:
         run: |
           # 1) Determine JSON files to bundle
           if [[ "${{ steps.check-modified-files.outputs.modified }}" == "true" ]]; then
+            echo "[INFO] group the JSON policy files to attach"
             mapfile -t json_paths < <(git diff --name-only HEAD~1 HEAD \
               | grep "^$WORKING_DIR/tf/[^/]*\.json$")
             files=(); for p in "${json_paths[@]}"; do files+=( "$(basename "$p")" ); done
@@ -167,6 +169,7 @@ jobs:
 
           if [ ${#files[@]} -eq 0 ]; then
             echo "[INFO] no JSON to bundle → skipping CreatePolicy"
+            exit 0
           fi
 
           # 2) Build the combined policy document
