@@ -146,11 +146,6 @@ jobs:
           ORG_AWS_REGION: ${{ vars.AWS_REGION }}
           TF_FILES: ${{ steps.check-modified-files.outputs.tf-files }}
         run: |
-          # Debug prints
-          echo "[DEBUG] pwd=$(pwd)"
-          echo "[DEBUG] ls=$(ls -1)"
-          echo "[DEBUG] TF_FILES='$TF_FILES'"
-
           # 1) Determine JSON files to bundle
           if [[ "${{ steps.check-modified-files.outputs.modified }}" == "true" ]]; then
             mapfile -t json_paths < <(git diff --name-only HEAD~1 HEAD \
@@ -160,7 +155,6 @@ jobs:
             echo "[INFO] scanning TF → JSON references via sed"
             refs=()
             for tf in $TF_FILES; do 
-              echo "[DEBUG] tf='$tf'"
               # sed pulls out the .json filename from templatefile("xxx.json",...)
               while read -r f; do
                 refs+=("$f")
@@ -171,7 +165,7 @@ jobs:
             files=( $(printf "%s\n" "${refs[@]}" | sort -u) )
           fi
 
-          echo "[DEBUG] policy JSONs = ${files[*]}"
+          echo "Will be attached policy JSONs = ${files[*]}"
           if [ ${#files[@]} -eq 0 ]; then
             echo "[INFO] no JSON to bundle → skipping CreatePolicy"
             exit 0
