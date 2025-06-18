@@ -52,49 +52,48 @@ jobs:
       - name: Debug AWS credentials configuration
         run: aws sts get-caller-identity
 
-      - name: Check for modified policy JSON & TF files
+      - name: Check for modified JSON & TF files
         id: check-modified-files
         shell: bash
         env:
           WORKING_DIR: ${{ inputs.working_dir }}
         run: |
           # 1) JSON diffs
-          modified_json_paths=$(git diff --name-only HEAD~1 HEAD \
+          modified_json=$(git diff --name-only HEAD~1 HEAD \
             | grep "^$WORKING_DIR/tf/[^/]*\.json$" || true)
-          if [[ -n "$modified_json_paths" ]]; then
-            echo "[INFO] Modified policy JSON files: $modified_json_paths"
+          if [[ -n "$modified_json" ]]; then
+            echo "[INFO] JSON changed: $modified_json"
             echo "modified=true" >> "$GITHUB_OUTPUT"
           else
-            echo "[INFO] No modified policy JSON files found."
+            echo "[INFO] No policy-JSON changes"
             echo "modified=false" >> "$GITHUB_OUTPUT"
           fi
 
-          # 2) TF diffs → capture only basenames
+          # 2) TF diffs → basenames only
           tf_paths=$(git diff --name-only HEAD~1 HEAD \
             | grep "^$WORKING_DIR/tf/.*\.tf$" || true)
           if [[ -n "$tf_paths" ]]; then
-            echo "[INFO] Terraform files changed: $tf_paths"
+            echo "[INFO] TF changed: $tf_paths"
             echo "tf-modified=true" >> "$GITHUB_OUTPUT"
             tf_basenames=()
             for p in $tf_paths; do
               tf_basenames+=( "$(basename "$p")" )
             done
-            # join with spaces
-            echo "tf-files=$(printf '%s ' "${tf_basenames[@]}")" >> "$GITHUB_OUTPUT"
+            echo "tf-files=${tf_basenames[*]}" >> "$GITHUB_OUTPUT"
           else
-            echo "[INFO] No Terraform changes detected."
+            echo "[INFO] No Terraform changes"
             echo "tf-modified=false" >> "$GITHUB_OUTPUT"
             echo "tf-files=" >> "$GITHUB_OUTPUT"
           fi
 
           # 3) Default-policy JSON diffs
-          modified_default_paths=$(git diff --name-only HEAD~1 HEAD \
+          default_json=$(git diff --name-only HEAD~1 HEAD \
             | grep "^$WORKING_DIR/tf/default-policy/.*\.json$" || true)
-          if [[ -n "$modified_default_paths" ]]; then
-            echo "[INFO] Modified default-policy JSON files: $modified_default_paths"
+          if [[ -n "$default_json" ]]; then
+            echo "[INFO] Default-policy JSON changed: $default_json"
             echo "default-modified=true" >> "$GITHUB_OUTPUT"
           else
-            echo "[INFO] No modified default-policy JSON files found."
+            echo "[INFO] No default-policy JSON changes"
             echo "default-modified=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -108,34 +107,30 @@ jobs:
           ORG_AWS_ACCOUNT_ID: ${{ vars.ORG_AWS_ACCOUNT_ID }}
           ORG_AWS_REGION: ${{ vars.AWS_REGION }}
         run: |
-          modified_default_files=$(git diff --name-only HEAD~1 HEAD \
+          defaults=$(git diff --name-only HEAD~1 HEAD \
             | grep "^$WORKING_DIR/tf/default-policy/.*\.json$")
-          for file in $modified_default_files; do
+          for file in $defaults; do
             base=$(basename "$file")
-            if [[ "$base" == "TrustPolicy.json" || "$base" == "ECRCrossAccountAccessPolicy.json" ]]; then
-              continue
-            fi
-            policy_name="$PROJECT_NAME-${base%.json}"
-            echo "[INFO] Updating default policy $policy_name from $base"
-            sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
-                    s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g; \
-                    s/\${USER_NAME}/$GITHUB_REPOSITORY_OWNER/g; \
-                    s/\${ORG_AWS_ACCOUNT_ID}/$ORG_AWS_ACCOUNT_ID/g; \
-                    s/\${ORG_AWS_REGION}/$ORG_AWS_REGION/g; \
-                    s/\${PROJECT_NAME}/$PROJECT_NAME/g" "$base"
+            [[ "$base" =~ ^(TrustPolicy|ECRCrossAccountAccessPolicy)\.json$ ]] && continue
+            policy="$PROJECT_NAME-${base%.json}"
+            echo "[INFO] Updating $policy from $base"
+            sed -i "s|\${AWS_REGION}|$AWS_REGION|g; \
+                    s|\${AWS_ACCOUNT_ID}|$AWS_ACCOUNT_ID|g; \
+                    s|\${USER_NAME}|$GITHUB_REPOSITORY_OWNER|g; \
+                    s|\${ORG_AWS_ACCOUNT_ID}|$ORG_AWS_ACCOUNT_ID|g; \
+                    s|\${ORG_AWS_REGION}|$ORG_AWS_REGION|g; \
+                    s|\${PROJECT_NAME}|$PROJECT_NAME|g" "$base"
             versions=$(aws iam list-policy-versions \
-              --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name" \
+              --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy" \
               --query 'Versions[?IsDefaultVersion==`false`].VersionId' \
               --output text)
             for v in $versions; do
-              echo "[INFO] Deleting old version $v"
               aws iam delete-policy-version \
-                --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name" \
+                --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy" \
                 --version-id "$v"
             done
-            echo "[INFO] Creating new default version of $policy_name"
             aws iam create-policy-version \
-              --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name" \
+              --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy" \
               --policy-document file://"$base" \
               --set-as-default
           done
@@ -149,63 +144,65 @@ jobs:
           AWS_REGION: ${{ vars.AWS_REGION }}
           ORG_AWS_ACCOUNT_ID: ${{ vars.ORG_AWS_ACCOUNT_ID }}
           ORG_AWS_REGION: ${{ vars.AWS_REGION }}
+          TF_FILES: ${{ steps.check-modified-files.outputs.tf-files }}
         run: |
-          # 1) Generate unique policy name
-          timestamp=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
-          uuid=$(uuidgen | cut -c1-8)
-          policy_name="temporary-${timestamp}-${uuid}"
-          policy_file="${policy_name}.json"
+          echo "[DEBUG] pwd=$(pwd)"
+          echo "[DEBUG] ls=$(ls)"
+          echo "[DEBUG] TF_FILES='$TF_FILES'"
 
-          # 2) Determine which JSONs to bundle
+          # 1) build list of JSON basenames
           if [[ "${{ steps.check-modified-files.outputs.modified }}" == "true" ]]; then
-            echo "[INFO] Bundling only changed JSON policies"
-            mapfile -t json_paths < <(git diff --name-only HEAD~1 HEAD \
+            mapfile -t jsons < <(git diff --name-only HEAD~1 HEAD \
               | grep "^$WORKING_DIR/tf/[^/]*\.json$")
             files=()
-            for p in "${json_paths[@]}"; do
+            for p in "${jsons[@]}"; do
               files+=( "$(basename "$p")" )
             done
           else
-            echo "[INFO] Scanning changed TF for JSON references"
-            read -r -a tf_list <<< "${{ steps.check-modified-files.outputs.tf-files }}"
+            echo "[INFO] scanning TF → JSON references"
+            read -ra tf_list <<< "$TF_FILES"
             refs=()
             for tf in "${tf_list[@]}"; do
               grep -hoE 'templatefile\("([^"]+\.json)"\)' "$tf" \
                 | sed -E 's/templatefile\("([^"]+)"\)/\1/' \
                 | while read -r f; do refs+=("$f"); done
             done
-            files=($(printf "%s\n" "${refs[@]}" | sort -u))
+            files=( $(printf "%s\n" "${refs[@]}" | sort -u) )
           fi
 
-          echo "[INFO] Files to attach: ${files[*]}"
+          echo "[DEBUG] policy JSONs = ${files[*]}"
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "[INFO] no JSON to bundle → skipping CreatePolicy"
+            exit 0
+          fi
 
-          # 3) Build the temporary policy doc
+          # 2) assemble the temp policy
+          ts=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
+          id=$(uuidgen | cut -c1-8)
+          pol="temporary-${ts}-${id}.json"
           {
-            echo '{ "Version": "2012-10-17", "Statement": ['
+            echo '{ "Version":"2012-10-17","Statement":['
             first=true
             for f in "${files[@]}"; do
-              if $first; then
-                first=false
-              else
-                echo ","
-              fi
+              $first && first=false || echo ","
               jq -c '.Statement[]' "$f"
             done
             echo "]}"
-          } > "$policy_file"
+          } > "$pol"
 
-          # 4) Substitute placeholders
-          sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
-                  s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g; \
-                  s/\${USER_NAME}/$GITHUB_REPOSITORY_OWNER/g; \
-                  s/\${ORG_AWS_ACCOUNT_ID}/$ORG_AWS_ACCOUNT_ID/g; \
-                  s/\${ORG_AWS_REGION}/$ORG_AWS_REGION/g; \
-                  s/\${PROJECT_NAME}/$PROJECT_NAME/g" "$policy_file"
+          # 3) substitute placeholders
+          sed -i "s|\${AWS_REGION}|$AWS_REGION|g; \
+                  s|\${AWS_ACCOUNT_ID}|$AWS_ACCOUNT_ID|g; \
+                  s|\${USER_NAME}|$GITHUB_REPOSITORY_OWNER|g; \
+                  s|\${ORG_AWS_ACCOUNT_ID}|$ORG_AWS_ACCOUNT_ID|g; \
+                  s|\${ORG_AWS_REGION}|$ORG_AWS_REGION|g; \
+                  s|\${PROJECT_NAME}|$PROJECT_NAME|g" "$pol"
 
-          # 5) Create & attach
+          # 4) publish
           aws iam create-policy \
-            --policy-name "$policy_name" \
-            --policy-document file://"$policy_file"
+            --policy-name "${pol%.json}" \
+            --policy-document file://"$pol"
           aws iam attach-role-policy \
             --role-name "${PROJECT_NAME}-GitHubActionsRole" \
-            --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name"
+            --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/${pol%.json}"
+
