@@ -159,7 +159,8 @@ jobs:
           else
             echo "[INFO] scanning TF → JSON references via sed"
             refs=()
-            for tf in "${tf_list[@]}"; do
+            for tf in $TF_FILES; do 
+              echo "[DEBUG] tf='$tf'"
               # sed pulls out the .json filename from templatefile("xxx.json",...)
               while read -r f; do
                 refs+=("$f")
