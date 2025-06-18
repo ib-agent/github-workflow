@@ -165,13 +165,11 @@ jobs:
           ORG_AWS_ACCOUNT_ID: ${{ vars.ORG_AWS_ACCOUNT_ID }}
           WORKING_DIR: ${{ inputs.working_dir }}
         run: |
-          # 1) Generate unique temporary policy name
           timestamp=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
           uuid=$(uuidgen | cut -c1-8)
           policy_name="temporary-${timestamp}-${uuid}"
           policy_file="${policy_name}.json"
 
-          # 2) Decide which JSON(s) to bundle
           if [[ "${{ steps.check-modified-files.outputs.modified }}" == "true" ]]; then
             echo "[INFO] Bundling only changed JSON policies"
             mapfile -t paths < <(git diff --name-only HEAD~1 HEAD \
@@ -180,14 +178,12 @@ jobs:
             for p in "${paths[@]}"; do
               files+=( "$(basename "$p")" )
             done
-
           else
             echo "[INFO] No JSON diff; scanning TF for JSON references"
             read -r -a tf_list <<< "${{ steps.check-modified-files.outputs.tf-files }}"
             refs=()
             for tf in "${tf_list[@]}"; do
-              grep -hoE 'templatefile\("([^"]+\.json)"\)' \
-                "$WORKING_DIR/tf/$tf" \
+              grep -hoE 'templatefile\("([^"]+\.json)"\)' "$tf" \
                 | sed -E 's/templatefile\("([^"]+)"\)/\1/' \
                 | while read -r f; do refs+=("$f"); done
             done
@@ -196,7 +192,6 @@ jobs:
 
           echo "[INFO] Files to attach: ${files[*]}"
 
-          # 3) Build combined temporary policy document
           echo '{ "Version":"2012-10-17", "Statement":[' > "$policy_file"
           first=true
           for f in "${files[@]}"; do
@@ -209,7 +204,6 @@ jobs:
           done
           echo "]}" >> "$policy_file"
 
-          # 4) Substitute placeholders
           sed -i "s/\${AWS_REGION}/$AWS_REGION/g; \
                   s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g; \
                   s/\${USER_NAME}/$GITHUB_REPOSITORY_OWNER/g; \
@@ -217,10 +211,9 @@ jobs:
                   s/\${ORG_AWS_REGION}/$ORG_AWS_REGION/g; \
                   s/\${PROJECT_NAME}/$PROJECT_NAME/g" "$policy_file"
 
-          # 5) Create and attach the IAM policy
           aws iam create-policy \
             --policy-name "$policy_name" \
             --policy-document file://"$policy_file"
           aws iam attach-role-policy \
             --role-name "${PROJECT_NAME}-GitHubActionsRole" \
-            --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name"
+            --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/$policy_name" 
