@@ -146,25 +146,23 @@ jobs:
           ORG_AWS_REGION: ${{ vars.AWS_REGION }}
           TF_FILES: ${{ steps.check-modified-files.outputs.tf-files }}
         run: |
+          # Debug prints
           echo "[DEBUG] pwd=$(pwd)"
-          echo "[DEBUG] ls=$(ls)"
+          echo "[DEBUG] ls=$(ls -1)"
           echo "[DEBUG] TF_FILES='$TF_FILES'"
 
-          # 1) build list of JSON basenames
+          # 1) Determine JSON files to bundle
           if [[ "${{ steps.check-modified-files.outputs.modified }}" == "true" ]]; then
-            mapfile -t jsons < <(git diff --name-only HEAD~1 HEAD \
+            mapfile -t json_paths < <(git diff --name-only HEAD~1 HEAD \
               | grep "^$WORKING_DIR/tf/[^/]*\.json$")
-            files=()
-            for p in "${jsons[@]}"; do
-              files+=( "$(basename "$p")" )
-            done
+            files=(); for p in "${json_paths[@]}"; do files+=( "$(basename "$p")" ); done
           else
             echo "[INFO] scanning TF → JSON references"
             read -ra tf_list <<< "$TF_FILES"
             refs=()
             for tf in "${tf_list[@]}"; do
-              grep -hoE 'templatefile\("([^"]+\.json)"\)' "$tf" \
-                | sed -E 's/templatefile\("([^"]+)"\)/\1/' \
+              # use -P lookbehind to grab only the filename
+              grep -hoP '(?<=templatefile\(")[^"]+\.json' "$tf" \
                 | while read -r f; do refs+=("$f"); done
             done
             files=( $(printf "%s\n" "${refs[@]}" | sort -u) )
@@ -176,7 +174,7 @@ jobs:
             exit 0
           fi
 
-          # 2) assemble the temp policy
+          # 2) Build the combined policy document
           ts=$(date -u +"%Y%m%d%H%M%S" -d '-6 hours')
           id=$(uuidgen | cut -c1-8)
           pol="temporary-${ts}-${id}.json"
@@ -190,7 +188,7 @@ jobs:
             echo "]}"
           } > "$pol"
 
-          # 3) substitute placeholders
+          # 3) Substitute placeholders
           sed -i "s|\${AWS_REGION}|$AWS_REGION|g; \
                   s|\${AWS_ACCOUNT_ID}|$AWS_ACCOUNT_ID|g; \
                   s|\${USER_NAME}|$GITHUB_REPOSITORY_OWNER|g; \
@@ -198,11 +196,10 @@ jobs:
                   s|\${ORG_AWS_REGION}|$ORG_AWS_REGION|g; \
                   s|\${PROJECT_NAME}|$PROJECT_NAME|g" "$pol"
 
-          # 4) publish
+          # 4) Publish
           aws iam create-policy \
             --policy-name "${pol%.json}" \
             --policy-document file://"$pol"
           aws iam attach-role-policy \
             --role-name "${PROJECT_NAME}-GitHubActionsRole" \
             --policy-arn "arn:aws:iam::$AWS_ACCOUNT_ID:policy/${pol%.json}"
-
