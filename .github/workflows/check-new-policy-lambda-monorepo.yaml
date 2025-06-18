@@ -167,7 +167,6 @@ jobs:
 
           if [ ${#files[@]} -eq 0 ]; then
             echo "[INFO] no JSON to bundle → skipping CreatePolicy"
-            exit 0
           fi
 
           # 2) Build the combined policy document
