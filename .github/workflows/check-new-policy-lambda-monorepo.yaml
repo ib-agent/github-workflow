@@ -157,13 +157,15 @@ jobs:
               | grep "^$WORKING_DIR/tf/[^/]*\.json$")
             files=(); for p in "${json_paths[@]}"; do files+=( "$(basename "$p")" ); done
           else
-            echo "[INFO] scanning TF → JSON references"
-            read -ra tf_list <<< "$TF_FILES"
+            echo "[INFO] scanning TF → JSON references via sed"
             refs=()
             for tf in "${tf_list[@]}"; do
-              # use -P lookbehind to grab only the filename
-              grep -hoP '(?<=templatefile\(")[^"]+\.json' "$tf" \
-                | while read -r f; do refs+=("$f"); done
+              # sed pulls out the .json filename from templatefile("xxx.json",...)
+              while read -r f; do
+                refs+=("$f")
+              done < <(
+                sed -nE 's/.*templatefile\("([^"]+\.json)"\,.*/\1/p' "$tf"
+              )
             done
             files=( $(printf "%s\n" "${refs[@]}" | sort -u) )
           fi
