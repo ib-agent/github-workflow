@@ -165,7 +165,6 @@ jobs:
             files=( $(printf "%s\n" "${refs[@]}" | sort -u) )
           fi
 
-          echo "Will be attached policy JSONs = ${files[*]}"
           if [ ${#files[@]} -eq 0 ]; then
             echo "[INFO] no JSON to bundle → skipping CreatePolicy"
             exit 0
