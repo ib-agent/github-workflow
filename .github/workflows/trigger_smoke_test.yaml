@@ -1,0 +1,39 @@
+name: Trigger Smoke Test
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  trigger-smoke-test:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Trigger Step Function
+        id: stepfn
+        run: |
+          INPUT_JSON='{
+            "company_list": ["dunder_mifflin", "ollie_pets_2"]
+          }'
+
+          STATE_MACHINE_ARN="arn:aws:states:${AWS_REGION}:${AWS_ACCOUNT_ID}:stateMachine:CompanyVDRIngestStateMachine"
+
+          echo "Triggering smoke test Step Function with input: $INPUT_JSON"
+          aws stepfunctions start-execution \
+            --state-machine-arn "$STATE_MACHINE_ARN" \
+            --input "$INPUT_JSON"
