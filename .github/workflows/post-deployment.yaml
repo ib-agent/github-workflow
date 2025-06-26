@@ -86,12 +86,18 @@ jobs:
         with:
           github-token: ${{ secrets.GH_TOKEN }}
           script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: "ib-agent",
-              repo: "github-workflow"
-              workflow_id: "trigger-smoke-test.yml",
-              ref: "main",
-              inputs: {
-                environment: "${{ inputs.environment }}",
-              }
-            });
+            try {
+              const result = await github.rest.actions.createWorkflowDispatch({await github.rest.actions.createWorkflowDispatch({
+                owner: "ib-agent",
+                repo: "github-workflow",
+                workflow_id: "trigger-smoke-test.yml",
+                ref: "main",
+                inputs: {
+                  environment: "${{ inputs.environment }}",
+                }
+              });
+              console.log(result);
+            } catch(error) {
+              console.error(error);
+              core.setFailed(error);
+            }
