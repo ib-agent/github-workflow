@@ -64,3 +64,18 @@ jobs:
         run: |
           cd tests/post-deployment
           pytest
+
+
+      - name: Trigger Smoke Test Validation
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "trigger-smoke-test.yml",
+              ref: context.ref,
+              inputs: {
+                environment: "${{ inputs.environment }}",
+              }
+            });
