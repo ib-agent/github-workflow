@@ -90,7 +90,7 @@ jobs:
               const result = await github.rest.actions.createWorkflowDispatch({
                 owner: 'ib-agent',
                 repo: 'github-workflow',
-                workflow_id: 'trigger-smoke-test.yml',
+                workflow_id: 'trigger-smoke-test.yaml',
                 ref: 'main',
                 inputs: {
                   environment: "${{ inputs.environment }}",
