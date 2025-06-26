@@ -94,6 +94,7 @@ jobs:
                 ref: 'main',
                 inputs: {
                   environment: "${{ inputs.environment }}",
+                  role_to_assume: "arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/Python-TF-Init-GitHubActionsRole"
                 }
               });
               console.log(result);
