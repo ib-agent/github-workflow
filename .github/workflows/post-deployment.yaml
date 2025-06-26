@@ -90,7 +90,7 @@ jobs:
               owner: "ib-agent",
               repo: "github-workflow"
               workflow_id: "trigger-smoke-test.yml",
-              ref: main,
+              ref: "main",
               inputs: {
                 environment: "${{ inputs.environment }}",
               }
