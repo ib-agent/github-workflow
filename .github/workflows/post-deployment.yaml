@@ -80,3 +80,17 @@ jobs:
           -e tests/postman/${{ inputs.environment }}.postman_environment.json \
           --env-var "bearer_token=${{ env.TOKEN }}" \
           --bail
+
+      - name: Trigger Smoke Test Validation
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "trigger-smoke-test.yml",
+              ref: context.ref,
+              inputs: {
+                environment: "${{ inputs.environment }}",
+              }
+            });

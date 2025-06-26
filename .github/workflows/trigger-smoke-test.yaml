@@ -1,0 +1,44 @@
+name: Trigger Smoke Test
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  trigger-smoke-test:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Trigger Step Function
+        id: stepfn
+        continue-on-error: true
+        run: |
+          set -e
+          INPUT_JSON='{
+            "environment": "${{ inputs.environment }}",
+            "company_list": ["dunder_mifflin", "ollie_pets_2"]
+          }'
+          EXEC_NAME="smoketest-${{ inputs.environment }}-${{ github.ref_name }}"
+
+          STATE_MACHINE_ARN="arn:aws:states:${AWS_REGION}:${AWS_ACCOUNT_ID}:stateMachine:CompanyVDRIngestStateMachine"
+
+          echo "Triggering smoke test Step Function with input: $INPUT_JSON, execution name: $EXEC_NAME"
+          aws stepfunctions start-execution \
+            --state-machine-arn "$STATE_MACHINE_ARN" \
+            --input "$INPUT_JSON" \
+            --name "$EXEC_NAME" || echo "Smoke test already running for this environment/branch. Skipping."
