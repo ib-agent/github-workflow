@@ -87,11 +87,11 @@ jobs:
           github-token: ${{ secrets.GH_TOKEN }}
           script: |
             try {
-              const result = await github.rest.actions.createWorkflowDispatch({await github.rest.actions.createWorkflowDispatch({
-                owner: "ib-agent",
-                repo: "github-workflow",
-                workflow_id: "trigger-smoke-test.yml",
-                ref: "main",
+              const result = await github.rest.actions.createWorkflowDispatch({
+                owner: 'ib-agent',
+                repo: 'github-workflow',
+                workflow_id: 'trigger-smoke-test.yml',
+                ref: 'main',
                 inputs: {
                   environment: "${{ inputs.environment }}",
                 }
