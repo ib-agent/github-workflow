@@ -39,11 +39,12 @@ jobs:
             "environment": "${{ inputs.environment }}",
             "company_list": ["dunder_mifflin", "ollie_pets_2"]
           }'
-          EXEC_NAME="smoketest-${{ inputs.environment }}-${{ github.ref_name }}"
+          EXEC_NAME="smoketest-${{ inputs.environment }}-${{ github.sha }}"
 
           STATE_MACHINE_ARN="arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:VDRSmokeTestStateMachine"
 
           echo "Triggering smoke test Step Function with input: $INPUT_JSON, execution name: $EXEC_NAME"
           aws stepfunctions start-execution \
             --state-machine-arn "$STATE_MACHINE_ARN" \
-            --input "$INPUT_JSON" 
+            --input "$INPUT_JSON" \
+            --name "$EXEC_NAME" || echo "Smoke test already running for this environment/branch. Skipping."
