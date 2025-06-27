@@ -7,7 +7,13 @@ on:
         description: 'Environment'
         required: true
         type: string
-
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
+        
 permissions:
   id-token: write
   contents: read
@@ -35,7 +41,7 @@ jobs:
           }'
           EXEC_NAME="smoketest-${{ inputs.environment }}-${{ github.ref_name }}"
 
-          STATE_MACHINE_ARN="arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:CompanyVDRIngestStateMachine"
+          STATE_MACHINE_ARN="arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:VDRSmokeTestStateMachine"
 
           echo "Triggering smoke test Step Function with input: $INPUT_JSON, execution name: $EXEC_NAME"
           aws stepfunctions start-execution \
