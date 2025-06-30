@@ -11,6 +11,14 @@ on:
         description: 'Project Name'
         required: true
         type: string
+      current_version:
+        description: 'Current Version of the service is pointed by the API Gateway'
+        required: true
+        type: string
+      version:
+        description: 'Version of the service to be deployed'
+        required: true
+        type: string
 
 permissions:
   id-token: write
@@ -40,7 +48,10 @@ jobs:
       - name: Wait for ECS Service to Stabilize
         id: wait
         run: |
-          SERVICE_NAME=${{ inputs.project_name }}-service
+          CURRENT_SERVICE_NAME=${{ inputs.project_name }}-service-${{ inputs.current_version }}
+          SERVICE_NAME=${{ inputs.project_name }}-service-${{ inputs.version }}
+          echo "Waiting for ECS service $CURRENT_SERVICE_NAME to stabilize..."
+          aws ecs wait services-stable --cluster ${{ env.CLUSTER_NAME }} --services $CURRENT_SERVICE_NAME
           echo "Waiting for ECS service $SERVICE_NAME to stabilize..."
           aws ecs wait services-stable --cluster ${{ env.CLUSTER_NAME }} --services $SERVICE_NAME
 

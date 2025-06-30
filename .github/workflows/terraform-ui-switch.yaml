@@ -1,0 +1,106 @@
+name: Switch Deployment Environment
+
+on: 
+  workflow_call:
+   inputs:
+      github_repository:
+        description: 'The GitHub repository name'
+        required: true
+        type: string
+      aws_account_id:
+        description: 'The AWS account id'
+        required: true
+        type: string
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      role_to_assume:
+        description: 'AWS Role to Assume'
+        required: true
+        type: string
+      environment_switch_approval:
+        description: 'environment, used in terraform switch environment with approval'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  switch_deployment_environment:
+    environment: ${{ inputs.environment_switch_approval }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./tf
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.role_to_assume }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Debug AWS credentials configuration
+        run: |
+          aws sts get-caller-identity
+
+      - name: Promote staging distribution to production
+        id: promote_staging_to_production
+        run: |
+          # Get distribution IDs
+          distribution_ids=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Origins.Items[0].DomainName, '${{ inputs.github_repository }}')].Id" \
+            --output json)
+
+          # Convert to array
+          distribution_ids=$(echo $distribution_ids | jq -r '.[]')
+
+          # Initialize variables
+          primary_id=""
+          staging_id=""
+          primary_etag=""
+          staging_etag=""
+
+          # Process each distribution
+          for distribution_id in $distribution_ids; do
+              config=$(aws cloudfront get-distribution-config --id $distribution_id)
+              etag=$(echo $config | jq -r '.ETag')
+              is_staging=$(echo $config | jq -r '.DistributionConfig.Staging')
+              
+              if [ "$is_staging" = "true" ]; then
+                  staging_id=$distribution_id
+                  staging_etag=$etag
+                  echo "Found staging distribution: $staging_id"
+              else
+                  primary_id=$distribution_id
+                  primary_etag=$etag
+                  echo "Found primary distribution: $primary_id"
+              fi
+          done
+
+          # Promote if both exist
+          if [ -n "$staging_id" ] && [ -n "$primary_id" ]; then
+              echo "Promoting staging distribution to primary..."
+              aws cloudfront update-distribution-with-staging-config \
+                  --id $primary_id \
+                  --staging-distribution-id $staging_id \
+                  --if-match $primary_etag,$staging_etag
+              
+              echo "primary_id=$primary_id" >> $GITHUB_OUTPUT
+              echo "staging_id=$staging_id" >> $GITHUB_OUTPUT
+          else
+              echo "No staging distribution found to promote"
+              exit 1
+          fi
+      
+      - name: Wait for distribution to be deployed
+        id: wait_for_distribution
+        run: |
+          primary_id=${{ steps.promote_staging_to_production.outputs.primary_id }}
+          aws cloudfront wait distribution-deployed --id $primary_id
+          echo "Distribution deployed: $primary_id"
