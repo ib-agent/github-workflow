@@ -1,0 +1,217 @@
+name: Example Step Function Usage
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: string
+        default: 'dev'
+      custom_input:
+        description: 'Custom input data (JSON)'
+        required: false
+        type: string
+        default: '{"custom_field": "example_value"}'
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ main ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # Example 1: Basic Step Function execution with GitHub context
+  basic-execution:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    outputs:
+      execution_arn: ${{ jobs.execute-step-function.outputs.execution_arn }}
+      execution_name: ${{ jobs.execute-step-function.outputs.execution_name }}
+
+    steps:
+      - name: Execute Basic Step Function
+        uses: ./.github/workflows/step-function-executor.yaml
+        with:
+          state_machine_arn: "arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:ExampleStateMachine"
+          execution_name_prefix: "basic"
+          input_data: |
+            {
+              "environment": "${{ github.event.inputs.environment || 'dev' }}",
+              "timestamp": "${{ github.event.head_commit.timestamp || '' }}",
+              "message": "Basic execution triggered by ${{ github.event_name }}"
+            }
+          include_github_context: "true"
+
+  # Example 2: Step Function execution with custom input and no GitHub context
+  custom-execution:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    outputs:
+      execution_arn: ${{ jobs.execute-step-function.outputs.execution_arn }}
+      execution_name: ${{ jobs.execute-step-function.outputs.execution_name }}
+
+    steps:
+      - name: Execute Custom Step Function
+        uses: ./.github/workflows/step-function-executor.yaml
+        with:
+          state_machine_arn: "arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:CustomStateMachine"
+          execution_name_prefix: "custom"
+          input_data: ${{ github.event.inputs.custom_input || '{"default": "value"}' }}
+          include_github_context: "false"
+
+  # Example 3: Step Function execution with complex input data
+  complex-execution:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    outputs:
+      execution_arn: ${{ jobs.execute-step-function.outputs.execution_arn }}
+      execution_name: ${{ jobs.execute-step-function.outputs.execution_name }}
+
+    steps:
+      - name: Prepare complex input data
+        id: prepare_input
+        run: |
+          COMPLEX_INPUT=$(jq -n \
+            --arg env "${{ github.event.inputs.environment || 'dev' }}" \
+            --arg sha "${{ github.sha }}" \
+            --arg actor "${{ github.actor }}" \
+            --arg event "${{ github.event_name }}" \
+            '{
+              environment: $env,
+              deployment_info: {
+                commit_sha: $sha,
+                triggered_by: $actor,
+                event_type: $event,
+                timestamp: now | todateiso8601
+              },
+              configuration: {
+                timeout_seconds: 300,
+                retry_count: 3,
+                enable_logging: true
+              },
+              data_processing: {
+                batch_size: 100,
+                parallel_workers: 5,
+                enable_validation: true
+              }
+            }'
+          )
+          echo "complex_input=$COMPLEX_INPUT" >> $GITHUB_OUTPUT
+
+      - name: Execute Complex Step Function
+        uses: ./.github/workflows/step-function-executor.yaml
+        with:
+          state_machine_arn: "arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:ComplexStateMachine"
+          execution_name_prefix: "complex"
+          input_data: ${{ steps.prepare_input.outputs.complex_input }}
+          include_github_context: "true"
+
+  # Example 4: Conditional Step Function execution based on event type
+  conditional-execution:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    outputs:
+      execution_arn: ${{ jobs.execute-step-function.outputs.execution_arn }}
+      execution_name: ${{ jobs.execute-step-function.outputs.execution_name }}
+
+    steps:
+      - name: Determine execution type
+        id: execution_type
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "execution_type=pr-validation" >> $GITHUB_OUTPUT
+            echo "execution_prefix=pr" >> $GITHUB_OUTPUT
+          else
+            echo "execution_type=deployment" >> $GITHUB_OUTPUT
+            echo "execution_prefix=deploy" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Execute Conditional Step Function
+        uses: ./.github/workflows/step-function-executor.yaml
+        with:
+          state_machine_arn: "arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:${{ steps.execution_type.outputs.execution_type }}"
+          execution_name_prefix: "${{ steps.execution_type.outputs.execution_prefix }}"
+          input_data: |
+            {
+              "environment": "${{ github.event.inputs.environment || 'dev' }}",
+              "execution_type": "${{ steps.execution_type.outputs.execution_type }}",
+              "trigger_event": "${{ github.event_name }}",
+              "branch": "${{ github.ref_name }}"
+            }
+          include_github_context: "true"
+
+  # Example 5: Multiple Step Functions in sequence
+  sequential-executions:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    needs: [basic-execution, custom-execution]
+    outputs:
+      final_execution_arn: ${{ jobs.execute-step-function.outputs.execution_arn }}
+      final_execution_name: ${{ jobs.execute-step-function.outputs.execution_name }}
+
+    steps:
+      - name: Execute Final Step Function
+        uses: ./.github/workflows/step-function-executor.yaml
+        with:
+          state_machine_arn: "arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:FinalStateMachine"
+          execution_name_prefix: "final"
+          input_data: |
+            {
+              "environment": "${{ github.event.inputs.environment || 'dev' }}",
+              "previous_executions": {
+                "basic": "${{ needs.basic-execution.outputs.execution_arn }}",
+                "custom": "${{ needs.custom-execution.outputs.execution_arn }}"
+              },
+              "execution_summary": "Sequential execution completed"
+            }
+          include_github_context: "true"
+
+  # Summary job to display all execution details
+  execution-summary:
+    runs-on: ubuntu-latest
+    needs: [basic-execution, custom-execution, complex-execution, conditional-execution, sequential-executions]
+    if: always()
+    steps:
+      - name: Display execution summary
+        run: |
+          echo "## Step Function Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.basic-execution.outputs.execution_arn }}" != "" ]; then
+            echo "### Basic Execution" >> $GITHUB_STEP_SUMMARY
+            echo "- **Name**: ${{ needs.basic-execution.outputs.execution_name }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **ARN**: ${{ needs.basic-execution.outputs.execution_arn }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.custom-execution.outputs.execution_arn }}" != "" ]; then
+            echo "### Custom Execution" >> $GITHUB_STEP_SUMMARY
+            echo "- **Name**: ${{ needs.custom-execution.outputs.execution_name }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **ARN**: ${{ needs.custom-execution.outputs.execution_arn }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.complex-execution.outputs.execution_arn }}" != "" ]; then
+            echo "### Complex Execution" >> $GITHUB_STEP_SUMMARY
+            echo "- **Name**: ${{ needs.complex-execution.outputs.execution_name }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **ARN**: ${{ needs.complex-execution.outputs.execution_arn }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.conditional-execution.outputs.execution_arn }}" != "" ]; then
+            echo "### Conditional Execution" >> $GITHUB_STEP_SUMMARY
+            echo "- **Name**: ${{ needs.conditional-execution.outputs.execution_name }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **ARN**: ${{ needs.conditional-execution.outputs.execution_arn }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.sequential-executions.outputs.final_execution_arn }}" != "" ]; then
+            echo "### Final Execution" >> $GITHUB_STEP_SUMMARY
+            echo "- **Name**: ${{ needs.sequential-executions.outputs.final_execution_name }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **ARN**: ${{ needs.sequential-executions.outputs.final_execution_arn }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi 

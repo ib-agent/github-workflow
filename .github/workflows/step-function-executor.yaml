@@ -1,0 +1,167 @@
+name: Step Function Executor
+
+on:
+  workflow_call:
+    inputs:
+      state_machine_arn:
+        description: 'The ARN of the Step Function state machine to execute'
+        required: true
+        type: string
+      execution_name_prefix:
+        description: 'Prefix for the execution name (will be combined with GitHub context)'
+        required: true
+        type: string
+      input_data:
+        description: 'JSON string containing the input data for the Step Function'
+        required: true
+        type: string
+      include_github_context:
+        description: 'Whether to include GitHub context in the execution name and input'
+        required: false
+        default: 'true'
+        type: string
+      max_execution_name_length:
+        description: 'Maximum length for execution name (default 256)'
+        required: false
+        default: '256'
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  execute-step-function:
+    runs-on: ubuntu-latest
+    outputs:
+      execution_arn: ${{ steps.stepfn.outputs.execution_arn }}
+      execution_name: ${{ steps.stepfn.outputs.execution_name }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Generate GitHub context JSON
+        id: github_context
+        if: inputs.include_github_context == 'true'
+        run: |
+          GITHUB_CONTEXT_JSON=$(jq -n \
+            --arg repo "${{ github.repository }}" \
+            --arg ref "${{ github.ref }}" \
+            --arg sha "${{ github.sha }}" \
+            --arg short_sha "${{ github.sha }}" \
+            --arg actor "${{ github.actor }}" \
+            --arg run_id "${{ github.run_id }}" \
+            --arg run_number "${{ github.run_number }}" \
+            --arg workflow "${{ github.workflow }}" \
+            --arg job "${{ github.job }}" \
+            --arg event_name "${{ github.event_name }}" \
+            --arg event_ref "${{ github.event.ref }}" \
+            --arg event_head_ref "${{ github.event.head_ref }}" \
+            --arg event_base_ref "${{ github.event.base_ref }}" \
+            --arg event_pull_request_number "${{ github.event.pull_request.number }}" \
+            '{
+                repository: $repo,
+                ref: $ref,
+                sha: $sha,
+                short_sha: ($short_sha | .[0:7]),
+                actor: $actor,
+                run_id: $run_id,
+                run_number: $run_number,
+                workflow: $workflow,
+                job: $job,
+                event_name: $event_name,
+                event_ref: $event_ref,
+                event_head_ref: $event_head_ref,
+                event_base_ref: $event_base_ref,
+                event_pull_request_number: $event_pull_request_number
+            }'
+          )
+          echo "github_context_json=$GITHUB_CONTEXT_JSON" >> $GITHUB_OUTPUT
+
+      - name: Generate execution name
+        id: execution_name
+        run: |
+          if [ "${{ inputs.include_github_context }}" = "true" ]; then
+            # Create a descriptive execution name with GitHub context
+            REPO_NAME=$(echo "${{ github.repository }}" | sed 's/.*\///')
+            SHORT_SHA="${{ github.sha }}" | cut -c1-7
+            ACTOR="${{ github.actor }}"
+            
+            # For PRs, include PR number
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              PR_NUMBER="${{ github.event.pull_request.number }}"
+              EXEC_NAME="${{ inputs.execution_name_prefix }}-$REPO_NAME-$SHORT_SHA-pr$PR_NUMBER-$ACTOR"
+            else
+              EXEC_NAME="${{ inputs.execution_name_prefix }}-$REPO_NAME-$SHORT_SHA-$ACTOR"
+            fi
+            
+            # Truncate if too long (leaving room for UUID)
+            MAX_LENGTH=$(({{ inputs.max_execution_name_length }} - 9))  # 9 chars for 8-char UUID + hyphen
+            if [ ${#EXEC_NAME} -gt $MAX_LENGTH ]; then
+              EXEC_NAME="${EXEC_NAME:0:$MAX_LENGTH}"
+            fi
+            
+            # Add UUID for uniqueness (first 8 characters only)
+            UUID=$(cat /proc/sys/kernel/random/uuid | tr -d '-' | cut -c1-8)
+            EXEC_NAME="$EXEC_NAME-$UUID"
+          else
+            # Simple execution name without GitHub context
+            UUID=$(cat /proc/sys/kernel/random/uuid | tr -d '-' | cut -c1-8)
+            EXEC_NAME="${{ inputs.execution_name_prefix }}-$UUID"
+          fi
+          
+          echo "execution_name=$EXEC_NAME" >> $GITHUB_OUTPUT
+
+      - name: Prepare Step Function input
+        id: prepare_input
+        run: |
+          if [ "${{ inputs.include_github_context }}" = "true" ]; then
+            # Parse the input data and add GitHub context
+            INPUT_JSON=$(echo '${{ inputs.input_data }}' | jq --argjson github_context '${{ steps.github_context.outputs.github_context_json }}' '. + {github_context: $github_context}')
+          else
+            # Use input data as-is
+            INPUT_JSON='${{ inputs.input_data }}'
+          fi
+          
+          echo "input_json=$INPUT_JSON" >> $GITHUB_OUTPUT
+
+      - name: Trigger Step Function
+        id: stepfn
+        continue-on-error: true
+        run: |
+          set -e
+          
+          echo "Triggering Step Function with execution name: ${{ steps.execution_name.outputs.execution_name }}"
+          echo "Input: ${{ steps.prepare_input.outputs.input_json }}"
+          
+          EXECUTION_ARN=$(aws stepfunctions start-execution \
+            --state-machine-arn "${{ inputs.state_machine_arn }}" \
+            --name "${{ steps.execution_name.outputs.execution_name }}" \
+            --input "${{ steps.prepare_input.outputs.input_json }}" \
+            --query 'executionArn' \
+            --output text)
+          
+          echo "execution_arn=$EXECUTION_ARN" >> $GITHUB_OUTPUT
+          echo "execution_name=${{ steps.execution_name.outputs.execution_name }}" >> $GITHUB_OUTPUT
+          
+          echo "Step Function execution started:"
+          echo "  Execution ARN: $EXECUTION_ARN"
+          echo "  Execution Name: ${{ steps.execution_name.outputs.execution_name }}"
+          echo "  State Machine: ${{ inputs.state_machine_arn }}"
+
+      - name: Display execution details
+        if: always()
+        run: |
+          echo "## Step Function Execution Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Execution Name**: ${{ steps.execution_name.outputs.execution_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **State Machine ARN**: ${{ inputs.state_machine_arn }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.stepfn.outputs.execution_arn }}" != "" ]; then
+            echo "- **Execution ARN**: ${{ steps.stepfn.outputs.execution_arn }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: Started successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status**: Failed to start" >> $GITHUB_STEP_SUMMARY
+          fi 
