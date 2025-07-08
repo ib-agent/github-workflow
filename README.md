@@ -1,6 +1,15 @@
 # GitHub Workflow - Step Function Executor
 
-This repository contains GitHub Actions workflows for managing AWS Step Function executions with enhanced GitHub context tracking.
+This repository contains GitHub Actions workflows for managing AWS Step Function executions with enhanced GitHub context tracking. Context introduced includes:
+
+- Repository information (owner/repo)
+- Git reference and commit SHA
+- Actor (user who triggered the workflow)
+- Workflow run details (ID, number, name)
+- Job information
+- Event details (type, ref, pull request number)
+- Short SHA for readable execution names
+
 
 ## Overview
 
