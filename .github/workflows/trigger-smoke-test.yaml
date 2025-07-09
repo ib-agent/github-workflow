@@ -22,9 +22,6 @@ jobs:
   trigger-smoke-test:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
-    outputs:
-      execution_arn: ${{ jobs.execute-step-function.outputs.execution_arn }}
-      execution_name: ${{ jobs.execute-step-function.outputs.execution_name }}
 
     steps:
       - name: Execute Step Function
