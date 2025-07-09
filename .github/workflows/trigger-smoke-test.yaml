@@ -91,8 +91,9 @@ jobs:
             --argjson github_context '${{ steps.github_context.outputs.github_context_json }}' \
             '{environment: $environment, company_list: $company_list, github_context: $github_context}'
           )
+          INPUT_JSON_COMPACT=$(echo "$INPUT_JSON" | jq -c .)
           echo "input_json<<EOF" >> $GITHUB_OUTPUT
-          echo "$INPUT_JSON" >> $GITHUB_OUTPUT
+          echo "$INPUT_JSON_COMPACT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Trigger Step Function
@@ -105,10 +106,12 @@ jobs:
           EXECUTION_ARN=$(aws stepfunctions start-execution \
             --state-machine-arn "arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:VDRSmokeTestStateMachine" \
             --name "${{ steps.execution_name.outputs.execution_name }}" \
-            --input "${{ steps.prepare_input.outputs.input_json }}" \
+            --input '${{ steps.prepare_input.outputs.input_json }}' \
             --query 'executionArn' \
             --output text)
-          echo "execution_arn=$EXECUTION_ARN" >> $GITHUB_OUTPUT
+          echo "execution_arn<<EOF" >> $GITHUB_OUTPUT
+          echo "$EXECUTION_ARN" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           echo "execution_name=${{ steps.execution_name.outputs.execution_name }}" >> $GITHUB_OUTPUT
           echo "Step Function execution started:"
           echo "  Execution ARN: $EXECUTION_ARN"
