@@ -7,12 +7,6 @@ on:
         description: 'Environment'
         required: true
         type: string
-  workflow_call:
-    inputs:
-      environment:
-        description: 'Environment'
-        required: true
-        type: string
 
 permissions:
   id-token: write
@@ -22,16 +16,109 @@ jobs:
   trigger-smoke-test:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
-
     steps:
-      - name: Execute Step Function
-        uses: ./.github/workflows/step-function-executor.yaml
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          state_machine_arn: "arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:VDRSmokeTestStateMachine"
-          execution_name_prefix: "smoketest"
-          input_data: |
-            {
-              "environment": "${{ inputs.environment }}",
-              "company_list": ["dunder_mifflin", "ollie_pets_2"]
-            }
-          include_github_context: "true"
+          role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Generate GitHub context JSON
+        id: github_context
+        run: |
+          GITHUB_CONTEXT_JSON=$(jq -n \
+            --arg repo "${{ github.repository }}" \
+            --arg ref "${{ github.ref }}" \
+            --arg sha "${{ github.sha }}" \
+            --arg short_sha "${{ github.sha }}" \
+            --arg actor "${{ github.actor }}" \
+            --arg run_id "${{ github.run_id }}" \
+            --arg run_number "${{ github.run_number }}" \
+            --arg workflow "${{ github.workflow }}" \
+            --arg job "${{ github.job }}" \
+            --arg event_name "${{ github.event_name }}" \
+            --arg event_ref "${{ github.event.ref }}" \
+            --arg event_head_ref "${{ github.event.head_ref }}" \
+            --arg event_base_ref "${{ github.event.base_ref }}" \
+            --arg event_pull_request_number "${{ github.event.pull_request.number }}" \
+            '{
+                repository: $repo,
+                ref: $ref,
+                sha: $sha,
+                short_sha: ($short_sha | .[0:7]),
+                actor: $actor,
+                run_id: $run_id,
+                run_number: $run_number,
+                workflow: $workflow,
+                job: $job,
+                event_name: $event_name,
+                event_ref: $event_ref,
+                event_head_ref: $event_head_ref,
+                event_base_ref: $event_base_ref,
+                event_pull_request_number: $event_pull_request_number
+            }'
+          )
+          echo "github_context_json=$GITHUB_CONTEXT_JSON" >> $GITHUB_OUTPUT
+
+      - name: Generate execution name
+        id: execution_name
+        run: |
+          REPO_NAME=$(echo "${{ github.repository }}" | sed 's/.*\///')
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          ACTOR="${{ github.actor }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            EXEC_NAME="smoketest-$REPO_NAME-$SHORT_SHA-pr$PR_NUMBER-$ACTOR"
+          else
+            EXEC_NAME="smoketest-$REPO_NAME-$SHORT_SHA-$ACTOR"
+          fi
+          MAX_LENGTH=$((256 - 9))  # 9 for 8-char UUID + hyphen
+          if [ ${#EXEC_NAME} -gt $MAX_LENGTH ]; then
+            EXEC_NAME="${EXEC_NAME:0:$MAX_LENGTH}"
+          fi
+          UUID=$(cat /proc/sys/kernel/random/uuid | tr -d '-' | cut -c1-8)
+          EXEC_NAME="$EXEC_NAME-$UUID"
+          echo "execution_name=$EXEC_NAME" >> $GITHUB_OUTPUT
+
+      - name: Prepare Step Function input
+        id: prepare_input
+        run: |
+          INPUT_JSON=$(jq -n \
+            --arg environment "${{ inputs.environment }}" \
+            --argjson company_list '["dunder_mifflin", "ollie_pets_2"]' \
+            --argjson github_context '${{ steps.github_context.outputs.github_context_json }}' \
+            '{environment: $environment, company_list: $company_list, github_context: $github_context}'
+          )
+          echo "input_json=$INPUT_JSON" >> $GITHUB_OUTPUT
+
+      - name: Trigger Step Function
+        id: stepfn
+        continue-on-error: true
+        run: |
+          set -e
+          echo "Triggering Step Function with execution name: ${{ steps.execution_name.outputs.execution_name }}"
+          echo "Input: ${{ steps.prepare_input.outputs.input_json }}"
+          EXECUTION_ARN=$(aws stepfunctions start-execution \
+            --state-machine-arn "arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:VDRSmokeTestStateMachine" \
+            --name "${{ steps.execution_name.outputs.execution_name }}" \
+            --input "${{ steps.prepare_input.outputs.input_json }}" \
+            --query 'executionArn' \
+            --output text)
+          echo "execution_arn=$EXECUTION_ARN" >> $GITHUB_OUTPUT
+          echo "execution_name=${{ steps.execution_name.outputs.execution_name }}" >> $GITHUB_OUTPUT
+          echo "Step Function execution started:"
+          echo "  Execution ARN: $EXECUTION_ARN"
+          echo "  Execution Name: ${{ steps.execution_name.outputs.execution_name }}"
+
+      - name: Display execution details
+        if: always()
+        run: |
+          echo "## Step Function Execution Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Execution Name**: ${{ steps.execution_name.outputs.execution_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **State Machine ARN**: arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:VDRSmokeTestStateMachine" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.stepfn.outputs.execution_arn }}" != "" ]; then
+            echo "- **Execution ARN**: ${{ steps.stepfn.outputs.execution_arn }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: Started successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status**: Failed to start" >> $GITHUB_STEP_SUMMARY
+          fi
