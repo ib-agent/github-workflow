@@ -58,7 +58,9 @@ jobs:
                 event_pull_request_number: $event_pull_request_number
             }'
           )
-          echo "github_context_json=$GITHUB_CONTEXT_JSON" >> $GITHUB_OUTPUT
+          echo "github_context_json<<EOF" >> $GITHUB_OUTPUT
+          echo "$GITHUB_CONTEXT_JSON" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Generate execution name
         id: execution_name
