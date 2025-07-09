@@ -91,7 +91,9 @@ jobs:
             --argjson github_context '${{ steps.github_context.outputs.github_context_json }}' \
             '{environment: $environment, company_list: $company_list, github_context: $github_context}'
           )
-          echo "input_json=$INPUT_JSON" >> $GITHUB_OUTPUT
+          echo "input_json<<EOF" >> $GITHUB_OUTPUT
+          echo "$INPUT_JSON" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Trigger Step Function
         id: stepfn
