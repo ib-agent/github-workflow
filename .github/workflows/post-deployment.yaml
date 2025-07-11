@@ -80,20 +80,23 @@ jobs:
           --env-var "bearer_token=${{ env.TOKEN }}" \
           --bail
 
-      - name: Get Commit Author Info
-        id: commit_author
+      - name: Get Commit and PR Info
+        id: context_info
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GH_TOKEN }}
           script: |
+            const isPR = context.eventName === "pull_request";
             const commit = await github.rest.repos.getCommit({
               owner: context.repo.owner,
               repo: context.repo.repo,
               ref: context.sha,
             });
+
             core.setOutput("commit_sha", context.sha);
             core.setOutput("repository", `${context.repo.owner}/${context.repo.repo}`);
-            core.setOutput("author", commit.data.commit.author.name);
+            core.setOutput("actor", commit.data.commit.author.name);
+            core.setOutput("pr_number", isPR ? context.payload.pull_request.number.toString() : "");
 
       - name: Trigger Smoke Test Validation
         uses: actions/github-script@v7
@@ -108,9 +111,10 @@ jobs:
                 ref: 'main',
                 inputs: {
                   environment: "${{ inputs.environment }}",
-                  commit_sha: "${{ steps.commit_author.outputs.commit_sha }}",
-                  repository: "${{ steps.commit_author.outputs.repository }}",
-                  actor: "${{ steps.commit_author.outputs.author }}"
+                  commit_sha: "${{ steps.context_info.outputs.commit_sha }}",
+                  repository: "${{ steps.context_info.outputs.repository }}",
+                  actor: "${{ steps.context_info.outputs.actor }}",
+                  pr_number: "${{ steps.context_info.outputs.pr_number }}"
                 }
               });
               console.log(result);

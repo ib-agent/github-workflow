@@ -19,6 +19,10 @@ on:
         description: 'Original commit author (optional if running locally)'
         required: false
         type: string
+      pr_number:
+        description: 'PR number (if triggered from pull_request)'
+        required: false
+        type: string
 
 permissions:
   id-token: write
@@ -41,6 +45,7 @@ jobs:
           REPO="${{ inputs.repository }}"
           SHA="${{ inputs.commit_sha }}"
           ACTOR="${{ inputs.actor }}"
+          PR_NUMBER="${{ inputs.pr_number }}"
           [ -z "$REPO" ] && REPO="${{ github.repository }}"
           [ -z "$SHA" ] && SHA="${{ github.sha }}"
           [ -z "$ACTOR" ] && ACTOR="${{ github.actor }}"
@@ -60,7 +65,7 @@ jobs:
             --arg event_ref "${{ github.event.ref }}" \
             --arg event_head_ref "${{ github.event.head_ref }}" \
             --arg event_base_ref "${{ github.event.base_ref }}" \
-            --arg event_pull_request_number "${{ github.event.pull_request.number }}" \
+            --arg event_pull_request_number "$PR_NUMBER" \
             '{
                 repository: $repo,
                 ref: $event_ref,
