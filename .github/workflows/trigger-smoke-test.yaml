@@ -45,6 +45,8 @@ jobs:
           REPO="${{ inputs.repository }}"
           SHA="${{ inputs.commit_sha }}"
           ACTOR="${{ inputs.actor }}"
+          [ -z "$ACTOR" ] && ACTOR="${{ github.actor }}"
+          ACTOR=$(echo "$ACTOR" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]/-/g')
           PR_NUMBER="${{ inputs.pr_number }}"
           [ -z "$REPO" ] && REPO="${{ github.repository }}"
           [ -z "$SHA" ] && SHA="${{ github.sha }}"
