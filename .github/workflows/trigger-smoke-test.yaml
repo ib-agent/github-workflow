@@ -7,6 +7,18 @@ on:
         description: 'Environment'
         required: true
         type: string
+      commit_sha:
+        description: 'Original commit SHA (optional if running locally)'
+        required: false
+        type: string
+      repository:
+        description: 'Original repository (optional if running locally)'
+        required: false
+        type: string
+      actor:
+        description: 'Original commit author (optional if running locally)'
+        required: false
+        type: string
 
 permissions:
   id-token: write
@@ -26,12 +38,20 @@ jobs:
       - name: Generate GitHub context JSON
         id: github_context
         run: |
+          REPO="${{ inputs.repository }}"
+          SHA="${{ inputs.commit_sha }}"
+          ACTOR="${{ inputs.actor }}"
+          [ -z "$REPO" ] && REPO="${{ github.repository }}"
+          [ -z "$SHA" ] && SHA="${{ github.sha }}"
+          [ -z "$ACTOR" ] && ACTOR="${{ github.actor }}"
+          SHORT_SHA=$(echo "$SHA" | cut -c1-7)
+
           GITHUB_CONTEXT_JSON=$(jq -n \
-            --arg repo "${{ github.repository }}" \
+            --arg repo "$REPO" \
             --arg ref "${{ github.ref }}" \
-            --arg sha "${{ github.sha }}" \
-            --arg short_sha "${{ github.sha }}" \
-            --arg actor "${{ github.actor }}" \
+            --arg sha "$SHA" \
+            --arg short_sha "$SHORT_SHA" \
+            --arg actor "$ACTOR" \
             --arg run_id "${{ github.run_id }}" \
             --arg run_number "${{ github.run_number }}" \
             --arg workflow "${{ github.workflow }}" \
@@ -43,9 +63,9 @@ jobs:
             --arg event_pull_request_number "${{ github.event.pull_request.number }}" \
             '{
                 repository: $repo,
-                ref: $ref,
+                ref: $event_ref,
                 sha: $sha,
-                short_sha: ($short_sha | .[0:7]),
+                short_sha: $short_sha,
                 actor: $actor,
                 run_id: $run_id,
                 run_number: $run_number,
@@ -56,8 +76,7 @@ jobs:
                 event_head_ref: $event_head_ref,
                 event_base_ref: $event_base_ref,
                 event_pull_request_number: $event_pull_request_number
-            }'
-          )
+            }')
           echo "github_context_json<<EOF" >> $GITHUB_OUTPUT
           echo "$GITHUB_CONTEXT_JSON" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -65,16 +84,14 @@ jobs:
       - name: Generate execution name
         id: execution_name
         run: |
-          REPO_NAME=$(echo "${{ github.repository }}" | sed 's/.*\///')
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          ACTOR="${{ github.actor }}"
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            PR_NUMBER="${{ github.event.pull_request.number }}"
-            EXEC_NAME="smoketest-$REPO_NAME-$SHORT_SHA-pr$PR_NUMBER-$ACTOR"
-          else
-            EXEC_NAME="smoketest-$REPO_NAME-$SHORT_SHA-$ACTOR"
-          fi
-          MAX_LENGTH=$((256 - 9))  # 9 for 8-char UUID + hyphen
+          REPO_NAME=$(echo "${{ inputs.repository }}" | sed 's/.*\///')
+          [ -z "$REPO_NAME" ] && REPO_NAME=$(echo "${{ github.repository }}" | sed 's/.*\///')
+          SHORT_SHA=$(echo "${{ inputs.commit_sha }}" | cut -c1-7)
+          [ -z "$SHORT_SHA" ] && SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          ACTOR="${{ inputs.actor }}"
+          [ -z "$ACTOR" ] && ACTOR="${{ github.actor }}"
+          EXEC_NAME="smoketest-$REPO_NAME-$SHORT_SHA-$ACTOR"
+          MAX_LENGTH=$((256 - 9))
           if [ ${#EXEC_NAME} -gt $MAX_LENGTH ]; then
             EXEC_NAME="${EXEC_NAME:0:$MAX_LENGTH}"
           fi
