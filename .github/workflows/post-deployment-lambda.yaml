@@ -93,7 +93,7 @@ jobs:
                 owner: 'ib-agent',
                 repo: 'github-workflow',
                 workflow_id: 'trigger-smoke-test.yaml',
-                ref: 'main',
+                ref: '${{ github.ref_name }}',
                 inputs: {
                   environment: "${{ inputs.environment }}",
                   commit_sha: "${{ steps.context_info.outputs.commit_sha }}",
