@@ -98,13 +98,13 @@ jobs:
                 owner: 'ib-agent',
                 repo: 'github-workflow',
                 workflow_id: 'trigger-smoke-test.yaml',
-                ref: 'KAN-1233-implement-notify-github-pr',
+                ref: '${{ github.ref_name }}',
                 inputs: {
                   environment: "${{ inputs.environment }}",
                   commit_sha: "${{ steps.context_info.outputs.commit_sha }}",
                   repository: "${{ steps.context_info.outputs.repository }}",
                   actor: "${{ steps.context_info.outputs.actor }}",
-                  pr_number: "${{ inputs.pr_number }}"
+                  pr_number: "${{ steps.context_info.outputs.pr_number }}"
                 }
               });
               console.log(result);
