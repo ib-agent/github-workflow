@@ -95,7 +95,7 @@ jobs:
 
             core.setOutput("commit_sha", context.sha);
             core.setOutput("repository", `${context.repo.owner}/${context.repo.repo}`);
-            core.setOutput("actor", commit.data.author.login);
+            core.setOutput("actor", commit.author.login);
             core.setOutput("pr_number", isPR ? context.payload.pull_request.number.toString() : "");
 
       - name: Trigger Smoke Test Validation
