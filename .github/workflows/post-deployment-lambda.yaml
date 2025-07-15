@@ -98,7 +98,7 @@ jobs:
                 owner: 'ib-agent',
                 repo: 'github-workflow',
                 workflow_id: 'trigger-smoke-test.yaml',
-                ref: '${{ github.ref_name }}',
+                ref: 'KAN-1233-implement-notify-github-pr',
                 inputs: {
                   environment: "${{ inputs.environment }}",
                   commit_sha: "${{ steps.context_info.outputs.commit_sha }}",
