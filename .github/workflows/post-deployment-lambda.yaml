@@ -78,6 +78,8 @@ jobs:
                 ref: 'main',
                 inputs: {
                   environment: "${{ inputs.environment }}"
+                  repository: "${{ github.repository }}"
+                  branch_ref: "${{ github.ref }}" 
                 }
               });
               console.log(result);

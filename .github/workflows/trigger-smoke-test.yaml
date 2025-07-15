@@ -15,6 +15,10 @@ on:
         description: 'Original repository (optional if running locally)'
         required: false
         type: string
+      branch_ref:
+        description: 'Branch ref that trigger the workflow'
+        required: false
+        type: string
       actor:
         description: 'Original commit author (optional if running locally)'
         required: false
