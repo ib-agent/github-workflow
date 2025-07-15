@@ -19,6 +19,10 @@ on:
         description: 'Original commit author (optional if running locally)'
         required: false
         type: string
+      branch_ref:
+        description: 'Branch that make pull_request'
+        required: false
+        type: string
       pr_number:
         description: 'PR number (if triggered from pull_request)'
         required: false
@@ -59,6 +63,7 @@ jobs:
             --arg sha "$SHA" \
             --arg short_sha "$SHORT_SHA" \
             --arg actor "$ACTOR" \
+            --arg branch_ref "${{ inputs.branch_ref }}" \
             --arg run_id "${{ github.run_id }}" \
             --arg run_number "${{ github.run_number }}" \
             --arg workflow "${{ github.workflow }}" \
@@ -70,7 +75,8 @@ jobs:
             --arg event_pull_request_number "$PR_NUMBER" \
             '{
                 repository: $repo,
-                ref: $event_ref,
+                ref: $ref,
+                branch_ref: $branch_ref,
                 sha: $sha,
                 short_sha: $short_sha,
                 actor: $actor,
