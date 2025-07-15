@@ -63,7 +63,7 @@ jobs:
             --arg sha "$SHA" \
             --arg short_sha "$SHORT_SHA" \
             --arg actor "$ACTOR" \
-            --branch_ref "${{ inputs.branch_ref }}" \
+            --arg branch_ref "${{ inputs.branch_ref }}" \
             --arg run_id "${{ github.run_id }}" \
             --arg run_number "${{ github.run_number }}" \
             --arg workflow "${{ github.workflow }}" \
