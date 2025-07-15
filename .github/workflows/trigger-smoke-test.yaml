@@ -111,7 +111,7 @@ jobs:
         run: |
           INPUT_JSON=$(jq -n \
             --arg environment "${{ inputs.environment }}" \
-            --argjson company_list '["dunder_mifflin", "ollie_pets_2"]' \
+            --argjson company_list '["dunder_mifflin"]' \
             --argjson github_context '${{ steps.github_context.outputs.github_context_json }}' \
             '{environment: $environment, company_list: $company_list, github_context: $github_context}'
           )
