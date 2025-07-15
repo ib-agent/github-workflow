@@ -70,7 +70,7 @@ jobs:
             --arg event_pull_request_number "$PR_NUMBER" \
             '{
                 repository: $repo,
-                ref: $event_ref,
+                ref: $ref,
                 sha: $sha,
                 short_sha: $short_sha,
                 actor: $actor,
