@@ -1,0 +1,100 @@
+name: PR Comment Trigger
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-comment:
+    if: github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.parse.outputs.should_run }}
+      company_name: ${{ steps.parse.outputs.company_name }}
+      environment: ${{ steps.parse.outputs.environment }}
+    steps:
+      - name: Parse comment
+        id: parse
+        run: |
+          COMMENT="${{ github.event.comment.body }}"
+          echo "Comment: $COMMENT"
+
+          # Check if comment matches pattern /run_company <company_name>
+          if echo "$COMMENT" | grep -qE '^/run_company\s+\S+'; then
+            COMPANY_NAME=$(echo "$COMMENT" | sed -E 's|^/run_company\s+(\S+).*|\1|')
+            echo "should_run=true" >> $GITHUB_OUTPUT
+            echo "company_name=$COMPANY_NAME" >> $GITHUB_OUTPUT
+            echo "environment=dev" >> $GITHUB_OUTPUT  # Default environment, can be made configurable
+            echo "Parsed company name: $COMPANY_NAME"
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "Comment does not match /run_company pattern"
+          fi
+
+  get-pr-info:
+    if: needs.check-comment.outputs.should_run == 'true'
+    needs: check-comment
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.pr_info.outputs.pr_number }}
+      head_sha: ${{ steps.pr_info.outputs.head_sha }}
+      head_ref: ${{ steps.pr_info.outputs.head_ref }}
+      base_ref: ${{ steps.pr_info.outputs.base_ref }}
+    steps:
+      - name: Get Commit and PR Info
+        id: context_info
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_TOKEN }}
+          script: |
+            const isPR = context.eventName === "pull_request";
+            const commit = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.sha,
+            });
+
+            core.setOutput("commit_sha", context.sha);
+            core.setOutput("repository", `${context.repo.owner}/${context.repo.repo}`);
+            core.setOutput("actor", commit.data.author.login);
+            core.setOutput("branch_ref", context.ref)
+            core.setOutput("pr_number", isPR ? context.payload.pull_request.number.toString() : "");
+
+  trigger-smoke-test:
+    if: needs.check-comment.outputs.should_run == 'true'
+    needs: [check-comment, get-pr-info]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger smoke test workflow
+        run: |
+          COMPANY_LIST='["${{ needs.check-comment.outputs.company_name }}"]'
+
+          gh workflow run trigger-smoke-test.yaml \
+            --repo ${{ github.repository }} \
+            --field environment="${{ needs.check-comment.outputs.environment }}" \
+            --field company_list="$COMPANY_LIST" \
+            --field commit_sha="${{ needs.get-pr-info.outputs.head_sha }}" \
+            --field repository="${{ github.repository }}" \
+            --field actor="${{ github.event.comment.user.login }}" \
+            --field branch_ref="${{ needs.get-pr-info.outputs.head_ref }}" \
+            --field pr_number="${{ needs.get-pr-info.outputs.pr_number }}"
+
+          echo "Triggered smoke test for company: ${{ needs.check-comment.outputs.company_name }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Add reaction to comment
+        run: |
+          gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions \
+            --method POST \
+            --field content='+1'
+        env:
+          GH_TOKEN: ${{ github.token }}
