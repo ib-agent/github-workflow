@@ -1,8 +1,12 @@
 name: PR Comment Trigger
 
 on:
-  issue_comment:
-    types: [created]
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: string
 
 permissions:
   contents: read
