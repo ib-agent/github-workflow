@@ -10,7 +10,7 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write 
 
 jobs:
   trigger_smoke_test:
@@ -76,8 +76,8 @@ jobs:
   trigger_ui_test:
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
-    needs:
-      - trigger_smoke_test    
+    needs: trigger_smoke_test 
+
     steps:
       - name: Trigger UI Test Validation
         uses: actions/github-script@v7
