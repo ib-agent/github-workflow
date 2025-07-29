@@ -90,7 +90,7 @@ jobs:
         run: cd tests/ui && npm i 
 
       - name: Install Playwright Browsers
-        run: npx playwright install
+        run: npx playwright install --with-deps
 
       - name: Capture UI state
         id: capture
