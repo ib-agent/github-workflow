@@ -1,4 +1,4 @@
-name: UI Post‑Deployment Tests
+name: Trigger UI Test 
 
 on:
   workflow_dispatch:
