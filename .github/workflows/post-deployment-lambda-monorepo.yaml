@@ -9,8 +9,11 @@ on:
         type: string
 
 permissions:
-  id-token: write
-  contents: write 
+  actions: read         # allow github.rest.actions.getWorkflowRun
+  pull-requests: read   # allow github.rest.repos.listPullRequestsAssociatedWithCommit
+  issues: write         # allow commenting on the PR
+  contents: read        # keep reading code/checkout
+  id-token: write       # if you still need OIDC
 
 jobs:
   # trigger_smoke_test:
