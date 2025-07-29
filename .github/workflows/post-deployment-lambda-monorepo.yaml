@@ -90,14 +90,14 @@ jobs:
         run: cd tests/ui && npm i 
 
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+        run: cd tests/ui && npx playwright install --with-deps
 
       - name: Capture UI state
         id: capture
         run: |
           # run our script and capture its console.log lines into outputs
           echo "Running capture UI state"
-          node test-ui-e2e.js >> $GITHUB_OUTPUT
+          node ./tests/ui/test-ui-e2e.js >> $GITHUB_OUTPUT
 
         env:
           UI_APP_URL: ${{ vars.UI_APP_URL }}
