@@ -2,7 +2,7 @@ name: UI Post‑Deployment Tests
 
 on:
   workflow_dispatch:
-   inputs:
+    inputs:
       environment:
         description: 'Environment'
         required: true
