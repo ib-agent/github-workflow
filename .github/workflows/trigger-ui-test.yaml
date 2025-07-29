@@ -1,0 +1,88 @@
+name: UI Post‑Deployment Tests
+
+on:
+  workflow_dispatch:
+   inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: string 
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  ui_e2e:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright Browsers
+        run: npx playwright install
+
+      - name: Capture UI state
+        id: capture
+        run: |
+          # run our script and capture its console.log lines into outputs
+          echo "Running capture UI state"
+          cd tests/ui && node test-ui-e2e.js >> $GITHUB_OUTPUT
+
+        env:
+          UI_APP_URL: ${{ vars.UI_APP_URL }}
+          TEST_EMAIL: ${{ secrets.UI_TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.UI_TEST_PASSWORD }}
+
+      - name: Upload screenshot as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshot
+          path: screenshot.png
+
+      - name: Find PR number for this commit
+        id: find_pr
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // find the run so we can grab head_sha
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId
+            });
+            const head = run.data.head_sha;
+            // list PRs for that SHA
+            const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: head
+            });
+            if (prs.length === 0) {
+              throw new Error(`No PR found for commit ${head}`);
+            }
+            return prs[0].number;
+
+      - name: Comment or update on the PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          issue-number: ${{ steps.find_pr.outputs.result }}
+          identifier: ui-post-deployment
+          body: |
+            ## 📸 UI Post‑Deployment Test
+            **Page URL:** ${{ steps.capture.outputs.url }}
+            <details>
+            <summary>Test UI screenshot</summary>
+
+            ![final](data:image/png;base64,${{ steps.capture.outputs.img }})
+            </details>
