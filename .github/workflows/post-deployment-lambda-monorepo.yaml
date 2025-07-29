@@ -86,8 +86,8 @@ jobs:
           script: |
             try {
               const result = await github.rest.actions.createWorkflowDispatch({
-                owner: 'ib-agent',
-                repo: 'github-workflow',
+                owner: context.repo.owner,
+                repo: context.repo.repo,
                 workflow_id: 'trigger-ui-test.yaml',
                 ref: 'KAN-1283-test-UI-invoke-workflow',
                 inputs: {
