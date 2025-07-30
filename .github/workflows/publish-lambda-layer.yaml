@@ -94,7 +94,7 @@ jobs:
           WORKING_DIR: ${{ inputs.working_dir }}
         run: |
           zip_file="${GITHUB_WORKSPACE}/${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip"
-          lambda_name="${{ steps.set_artifact_name.outputs.artifact_name }}-layer"
+          lambda_name="${{ steps.set_artifact_name.outputs.artifact_name }}"
           aws lambda publish-layer-version \
             --layer-name "$lambda_name-layer" \
             --description "Lambda layer for $lambda_name dependencies" \
