@@ -1,0 +1,163 @@
+name: Publish Lambda Layer
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'The environment to deploy to'
+        required: true
+        type: string
+      working_dir:
+        description: 'The directory of the Lambda function'
+        required: false
+        default: '.'
+        type: string
+      role_to_assume:
+        description: 'the aws role to assume'
+        required: false
+        default: ''
+        type: string
+
+    outputs:
+      checksum:
+        description: "The checksum of the artifact"
+        value: ${{ jobs.upload.outputs.checksum }}
+
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+
+  layer:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working_dir }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set role if not provided
+        id: set_role
+        run: |
+          if [ -z "${{ inputs.role_to_assume }}" ]; then
+            echo "role=${{ vars.ROLE_TO_ASSUME }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "role=${{ inputs.role_to_assume }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.set_role.outputs.role }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Set artifact name based on working directory
+        id: set_artifact_name
+        run: |
+          if [ "${{ inputs.working_dir }}" = "." ]; then
+            echo "artifact_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+          else
+            ARTIFACT_NAME=$(basename ${{ inputs.working_dir }})
+            echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for requirements.txt and install dependencies
+        id: check_requirements
+        run: |
+          if [ -f "requirements.txt" ]; then
+            TEMP_DIR=$(mktemp -d)
+            mkdir -p $TEMP_DIR/python
+            pip3 install --platform manylinux2014_x86_64 \
+                         --implementation cp \
+                         --python-version 3.12 \
+                         --only-binary=:all: \
+                         -r requirements.txt -t $TEMP_DIR/python
+
+            cd $TEMP_DIR
+            zip -r ../${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip .
+            cp -v ../${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip ${GITHUB_WORKSPACE}
+            rm -rf $TEMP_DIR
+
+            echo "Layer created and zipped as ${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip" 
+            echo "layer_created=true" >> $GITHUB_OUTPUT 
+          else
+            echo "No requirements.txt found. Skipping layer creation."
+          fi
+
+      - name: Upload Lambda layer zip to S3 (if created)
+        if: success() && steps.check_requirements.outputs.layer_created == 'true'
+        run: |
+          aws s3 cp ${GITHUB_WORKSPACE}/${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip s3://${{ vars.LAMBDA_BUCKET_PREFIX}}-${{ vars.AWS_ACCOUNT_ID}}/${{ steps.set_artifact_name.outputs.artifact_name }}/${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip
+
+      - name: Publish Lambda layer version
+        env:
+          WORKING_DIR: ${{ inputs.working_dir }}
+        run: |
+          zip_file="${GITHUB_WORKSPACE}/${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip"
+          lambda_name=$(basename $WORKING_DIR)
+          aws lambda publish-layer-version \
+            --layer-name "$lambda_name-layer" \
+            --description "Lambda layer for $lambda_name dependencies" \
+            --compatible-runtimes python3.12 \
+            --zip-file fileb://$zip_file
+
+  upload:
+    needs:
+      - layer
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working_dir }}
+    outputs:
+      checksum: ${{ steps.checksum.outputs.checksum }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set artifact name based on working directory
+        id: set_artifact_name
+        run: |
+          if [ "${{ inputs.working_dir }}" = "." ]; then
+            echo "artifact_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+          else
+            ARTIFACT_NAME=$(basename ${{ inputs.working_dir }})
+            echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Zip Lambda function
+        run: |
+          cd app
+          zip -r ../${{ steps.set_artifact_name.outputs.artifact_name }}.zip .
+
+      - name: Calculate checksum
+        id: checksum
+        run: |
+          shasum -a 256 ${{ steps.set_artifact_name.outputs.artifact_name }}.zip > checksum.txt
+          CHECKSUM=$(cut -d ' ' -f 1 checksum.txt)
+          echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+
+      - name: Set role if not provided
+        id: set_role
+        run: |
+          if [ -z "${{ inputs.role_to_assume }}" ]; then
+            echo "role=${{ vars.ROLE_TO_ASSUME }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "role=${{ inputs.role_to_assume }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.set_role.outputs.role }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Upload Lambda zip to S3
+        run: |
+          aws s3 cp ${{ steps.set_artifact_name.outputs.artifact_name }}.zip s3://${{ vars.LAMBDA_BUCKET_PREFIX}}-${{ vars.AWS_ACCOUNT_ID}}/${{ steps.set_artifact_name.outputs.artifact_name }}/${{ steps.set_artifact_name.outputs.artifact_name }}.zip
