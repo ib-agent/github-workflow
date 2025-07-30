@@ -74,12 +74,12 @@ jobs:
                          --only-binary=:all: \
                          -r requirements.txt -t $TEMP_DIR/python 
 
-            find python/ -name '*.txt'      -type f -delete
-            find python/ -name '*.md'       -type f -delete
-            find python/ -name 'tests'      -type d | xargs rm -rf
-            find python/ -name '*.dist-info' -type d | xargs rm -rf
-            find python/ -name '__pycache__' -type d | xargs rm -rf
-            find python/ -name '*.pyc'      -type f -delete     
+            find $TEMP_DIR/python/ -name '*.txt'      -type f -delete
+            find $TEMP_DIR/python/ -name '*.md'       -type f -delete
+            find $TEMP_DIR/python/ -name 'tests'      -type d | xargs rm -rf
+            find $TEMP_DIR/python/ -name '*.dist-info' -type d | xargs rm -rf
+            find $TEMP_DIR/python/ -name '__pycache__' -type d | xargs rm -rf
+            find $TEMP_DIR/python/ -name '*.pyc'      -type f -delete     
 
             cd $TEMP_DIR
             zip -r ../${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip .
