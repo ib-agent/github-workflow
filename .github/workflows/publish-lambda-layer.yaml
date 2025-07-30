@@ -67,11 +67,19 @@ jobs:
           if [ -f "requirements.txt" ]; then
             TEMP_DIR=$(mktemp -d)
             mkdir -p $TEMP_DIR/python
-            pip3 install --platform manylinux2014_x86_64 \
+            pip3 install --no-cache-dir \
+                         --platform manylinux2014_x86_64 \
                          --implementation cp \
                          --python-version 3.12 \
                          --only-binary=:all: \
-                         -r requirements.txt -t $TEMP_DIR/python
+                         -r requirements.txt -t $TEMP_DIR/python :contentReference[oaicite:6]{index=6}
+
+            find python/ -name '*.txt'      -type f -delete
+            find python/ -name '*.md'       -type f -delete
+            find python/ -name 'tests'      -type d | xargs rm -rf
+            find python/ -name '*.dist-info' -type d | xargs rm -rf
+            find python/ -name '__pycache__' -type d | xargs rm -rf
+            find python/ -name '*.pyc'      -type f -delete     
 
             cd $TEMP_DIR
             zip -r ../${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip .
