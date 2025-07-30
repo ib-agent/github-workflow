@@ -56,15 +56,10 @@ jobs:
           role-to-assume: ${{ steps.set_role.outputs.role }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Set artifact name based on working directory
+      - name: Set artifact name
         id: set_artifact_name
         run: |
-          if [ "${{ inputs.working_dir }}" = "." ]; then
-            echo "artifact_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
-          else
-            ARTIFACT_NAME=$(basename ${{ inputs.working_dir }})
-            echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
-          fi
+          echo "artifact_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
 
       - name: Check for requirements.txt and install dependencies
         id: check_requirements
