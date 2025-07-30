@@ -108,3 +108,21 @@ jobs:
             --description "Lambda layer for $lambda_name dependencies" \
             --compatible-runtimes python3.12 \
             --zip-file fileb://$zip_file
+
+      - name: Prune old layer versions
+        if: steps.check_requirements.outputs.layer_created == 'true'
+        run: |
+          lambda_name="${{ steps.set_artifact_name.outputs.artifact_name }}"
+          
+          # 1. Get versions beyond the 10 newest
+          to_delete=$(aws lambda list-layer-versions \
+            --layer-name "$lambda_name-layer" \
+            --query 'LayerVersions[10:].Version' \
+            --output text)
+          
+          # 2. Delete each old version
+          for v in $to_delete; do
+            aws lambda delete-layer-version \
+              --layer-name "$lambda_name-layer" \
+              --version-number $v
+          done
