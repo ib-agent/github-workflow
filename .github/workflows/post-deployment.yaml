@@ -87,17 +87,27 @@ jobs:
           github-token: ${{ secrets.GH_TOKEN }}
           script: |
             const isPR = context.eventName === "pull_request";
-            const commit = await github.rest.repos.getCommit({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: context.sha,
-            });
-
+            const author =
+            context.actor ||
+            (await github.rest.repos
+              .getCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: context.sha,
+              }))
+              .data.author?.login ||
+            (await github.rest.repos
+              .getCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: context.sha,
+              }))
+              .data.commit.author.name;
             core.setOutput("commit_sha", context.sha);
             core.setOutput("repository", `${context.repo.owner}/${context.repo.repo}`);
-            core.setOutput("actor", commit.data.author.login);
+            core.setOutput("actor", author);
             core.setOutput("branch_ref", context.ref)
-            core.setOutput("pr_number", isPR ? context.payload.pull_request.number.toString() : "");
+            core.setOutput("pr_number", isPR ? context.payload.pull_request.number.toString() : ""); 
 
       - name: Trigger Smoke Test Validation
         uses: actions/github-script@v7
