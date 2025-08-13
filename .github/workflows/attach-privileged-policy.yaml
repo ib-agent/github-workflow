@@ -1,7 +1,7 @@
 name: Attach AdministratorAccess Policy
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       project_name:
         description: 'The GitHub repository name'
