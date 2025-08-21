@@ -11,11 +11,11 @@ on:
         description: 'Project Name'
         required: true
         type: string
-      company_list:                       
-        description: 'Company list'
+      company_list:
+        description: 'Company list (JSON array)'
         required: false
         type: string
-        default: '["dunder_mifflin","ollie_pets_2"]'
+        default: '["dunder_mifflin", "ollie_pets_2"]'
 
 permissions:
   id-token: write
@@ -25,6 +25,13 @@ jobs:
   stabilize:
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
+    outputs:
+      commit_sha: ${{ steps.commit_info.outputs.commit_sha }}
+      repository: ${{ steps.commit_info.outputs.repository }}
+      actor: ${{ steps.commit_info.outputs.actor }}
+      branch_ref: ${{ steps.commit_info.outputs.branch_ref }}
+      pr_number: ${{ steps.commit_info.outputs.pr_number }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,16 +51,29 @@ jobs:
       - name: Wait for ECS Service to Stabilize
         id: wait
         run: |
-          set -Eeuo pipefail
           SERVICE_NAME=${{ inputs.project_name }}-service
           echo "Waiting for ECS service $SERVICE_NAME to stabilize..."
-          aws ecs wait services-stable --cluster "${{ env.CLUSTER_NAME }}" --services "$SERVICE_NAME"
+          aws ecs wait services-stable --cluster ${{ env.CLUSTER_NAME }} --services $SERVICE_NAME
+
+      - name: Get Commit and PR Info
+        id: commit_info
+        run: |
+          echo "commit_sha=${GITHUB_SHA}" >> $GITHUB_OUTPUT
+          echo "repository=${GITHUB_REPOSITORY}" >> $GITHUB_OUTPUT
+          echo "actor=${GITHUB_ACTOR}" >> $GITHUB_OUTPUT
+          echo "branch_ref=${GITHUB_REF}" >> $GITHUB_OUTPUT
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            PR_NUMBER=$(jq '.number' < "$GITHUB_EVENT_PATH")
+          else
+            PR_NUMBER=""
+          fi
+          echo "pr_number=${PR_NUMBER}" >> $GITHUB_OUTPUT
 
   post-deployment-tests:
-    needs: 
-      - stabilize
+    needs: [stabilize]
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -74,44 +94,21 @@ jobs:
 
       - name: Retrieve Cognito Token
         run: |
-          set -Eeuo pipefail
           TOKEN=$(./tests/getToken.sh)
           echo "TOKEN=$TOKEN" >> $GITHUB_ENV
 
       - name: Run Postman tests
         run: |
-          set -Eeuo pipefail
-          newman run "tests/postman/${{ inputs.project_name }}.postman_collection.json" \
-            -e "tests/postman/${{ inputs.environment }}.postman_environment.json" \
-            --env-var "bearer_token=${{ env.TOKEN }}" \
-            --bail
-
-      - name: Get Commit and PR Info
-        id: context_info
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GH_TOKEN }}
-          script: |
-            const isPR = context.eventName === "pull_request";
-            const commit = await github.rest.repos.getCommit({
-              owner: context.repo.owner, repo: context.repo.repo, ref: context.sha,
-            });
-            const authorLogin = commit.data.author?.login;
-            const authorName  = commit.data.commit?.author?.name;
-            const actor = context.actor || authorLogin || authorName || "unknown";
-            core.setOutput("commit_sha", context.sha);
-            core.setOutput("repository", `${context.repo.owner}/${context.repo.repo}`);
-            core.setOutput("actor", actor);
-            core.setOutput("branch_ref", context.ref);
-            core.setOutput("pr_number", isPR ? String(context.payload.pull_request.number) : "");
+          newman run tests/postman/${{ inputs.project_name }}.postman_collection.json \
+          -e tests/postman/${{ inputs.environment }}.postman_environment.json \
+          --env-var "bearer_token=${{ env.TOKEN }}" \
+          --bail
 
   trigger-smoke-test:
-    needs: 
-      - post-deployment-tests
+    needs: [post-deployment-tests]
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
-    env:
-      STATE_MACHINE_ARN: arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:VDRSmokeTestStateMachine
+
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -122,15 +119,15 @@ jobs:
       - name: Generate GitHub context JSON
         id: github_context
         run: |
-          set -Eeuo pipefail
-          REPO="${{ steps.context_info.outputs.repository }}"
-          SHA="${{ steps.context_info.outputs.commit_sha }}"
-          ACTOR="${{ steps.context_info.outputs.actor }}"
+          REPO="${{ needs.stabilize.outputs.repository }}"
+          SHA="${{ needs.stabilize.outputs.commit_sha }}"
+          ACTOR="${{ needs.stabilize.outputs.actor }}"
+          [ -z "$ACTOR" ] && ACTOR="${{ github.actor }}"
+          ACTOR=$(echo "$ACTOR" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]/-/g')
+          PR_NUMBER="${{ needs.stabilize.outputs.pr_number }}"
           [ -z "$REPO" ] && REPO="${{ github.repository }}"
           [ -z "$SHA" ] && SHA="${{ github.sha }}"
           [ -z "$ACTOR" ] && ACTOR="${{ github.actor }}"
-          ACTOR=$(echo "$ACTOR" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]/-/g')
-          PR_NUMBER="${{ steps.context_info.outputs.pr_number }}"
           SHORT_SHA=$(echo "$SHA" | cut -c1-7)
 
           GITHUB_CONTEXT_JSON=$(jq -n \
@@ -139,7 +136,7 @@ jobs:
             --arg sha "$SHA" \
             --arg short_sha "$SHORT_SHA" \
             --arg actor "$ACTOR" \
-            --arg branch_ref "${{ steps.context_info.outputs.branch_ref }}" \
+            --arg branch_ref "${{ needs.stabilize.outputs.branch_ref }}" \
             --arg run_id "${{ github.run_id }}" \
             --arg run_number "${{ github.run_number }}" \
             --arg workflow "${{ github.workflow }}" \
@@ -150,21 +147,21 @@ jobs:
             --arg event_base_ref "${{ github.event.base_ref }}" \
             --arg event_pull_request_number "$PR_NUMBER" \
             '{
-              repository: $repo,
-              ref: $ref,
-              branch_ref: $branch_ref,
-              sha: $sha,
-              short_sha: $short_sha,
-              actor: $actor,
-              run_id: $run_id,
-              run_number: $run_number,
-              workflow: $workflow,
-              job: $job,
-              event_name: $event_name,
-              event_ref: $event_ref,
-              event_head_ref: $event_head_ref,
-              event_base_ref: $event_base_ref,
-              event_pull_request_number: $event_pull_request_number
+                repository: $repo,
+                ref: $ref,
+                branch_ref: $branch_ref,
+                sha: $sha,
+                short_sha: $short_sha,
+                actor: $actor,
+                run_id: $run_id,
+                run_number: $run_number,
+                workflow: $workflow,
+                job: $job,
+                event_name: $event_name,
+                event_ref: $event_ref,
+                event_head_ref: $event_head_ref,
+                event_base_ref: $event_base_ref,
+                event_pull_request_number: $event_pull_request_number
             }')
           echo "github_context_json<<EOF" >> $GITHUB_OUTPUT
           echo "$GITHUB_CONTEXT_JSON" >> $GITHUB_OUTPUT
@@ -173,11 +170,11 @@ jobs:
       - name: Generate execution name
         id: execution_name
         run: |
-          REPO_NAME=$(echo "${{ inputs.repository }}" | sed 's/.*\///')
+          REPO_NAME=$(echo "${{ needs.stabilize.outputs.repository }}" | sed 's/.*\///')
           [ -z "$REPO_NAME" ] && REPO_NAME=$(echo "${{ github.repository }}" | sed 's/.*\///')
-          SHORT_SHA=$(echo "${{ inputs.commit_sha }}" | cut -c1-7)
+          SHORT_SHA=$(echo "${{ needs.stabilize.outputs.commit_sha }}" | cut -c1-7)
           [ -z "$SHORT_SHA" ] && SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          ACTOR="${{ inputs.actor }}"
+          ACTOR="${{ needs.stabilize.outputs.actor }}"
           [ -z "$ACTOR" ] && ACTOR="${{ github.actor }}"
           EXEC_NAME="smoketest-$REPO_NAME-$SHORT_SHA-$ACTOR"
           MAX_LENGTH=$((256 - 9))
@@ -191,22 +188,15 @@ jobs:
       - name: Prepare Step Function input
         id: prepare_input
         run: |
-          set -Eeuo pipefail
-          RAW_COMPANY='${{ inputs.company_list }}'
-          if [ -z "$RAW_COMPANY" ]; then RAW_COMPANY="[]"; fi
-          echo "$RAW_COMPANY" | jq -e . >/dev/null
-          COMPANY_COMPACT=$(echo "$RAW_COMPANY" | jq -c .)
-
-          GITHUB_CONTEXT='${{ steps.github_context.outputs.github_context_json }}'
-          echo "$GITHUB_CONTEXT" | jq -e . >/dev/null
-
           INPUT_JSON=$(jq -n \
             --arg environment "${{ inputs.environment }}" \
-            --argjson company_list "$COMPANY_COMPACT" \
-            --argjson github_context "$GITHUB_CONTEXT" \
-            '{environment: $environment, company_list: $company_list, github_context: $github_context}' )
+            --argjson company_list '${{ inputs.company_list }}' \
+            --argjson github_context '${{ steps.github_context.outputs.github_context_json }}' \
+            '{environment: $environment, company_list: $company_list, github_context: $github_context}'
+          )
+          INPUT_JSON_COMPACT=$(echo "$INPUT_JSON" | jq -c .)
           echo "input_json<<EOF" >> $GITHUB_OUTPUT
-          echo "$INPUT_JSON" | jq -c . >> $GITHUB_OUTPUT
+          echo "$INPUT_JSON_COMPACT" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Trigger Step Function
@@ -232,13 +222,12 @@ jobs:
       - name: Display execution details
         if: always()
         run: |
-          echo "## Step Function Execution Details ###"
-          echo "- **Execution Name**: ${{ steps.execution_name.outputs.execution_name }}"
-          echo "- **State Machine ARN**: arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:VDRSmokeTestStateMachine"
+          echo "## Step Function Execution Details" 
+          echo "- **Execution Name**: ${{ steps.execution_name.outputs.execution_name }}" 
+          echo "- **State Machine ARN**: arn:aws:states:${{ vars.AWS_REGION }}:${{ vars.AWS_ACCOUNT_ID }}:stateMachine:VDRSmokeTestStateMachine" 
           if [ "${{ steps.stepfn.outputs.execution_arn }}" != "" ]; then
-            echo "- **Execution ARN**: ${{ steps.stepfn.outputs.execution_arn }}"
-            echo "- **Status**: Started successfully"
+            echo "- **Execution ARN**: ${{ steps.stepfn.outputs.execution_arn }}" 
+            echo "- **Status**: Started successfully" 
           else
-            echo "- **Status**: Failed to start"
-          fi 
-
+            echo "- **Status**: Failed to start" 
+          fi
