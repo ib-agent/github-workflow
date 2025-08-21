@@ -119,13 +119,6 @@ jobs:
           role-to-assume: ${{ vars.ROLE_TO_ASSUME }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: AWS sanity check
-        run: |
-          set -Eeuo pipefail
-          aws --version
-          aws sts get-caller-identity
-          aws stepfunctions describe-state-machine --state-machine-arn "$STATE_MACHINE_ARN" >/dev/null
-
       - name: Generate GitHub context JSON
         id: github_context
         run: |
