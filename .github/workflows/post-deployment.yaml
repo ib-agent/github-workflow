@@ -136,7 +136,7 @@ jobs:
             --arg sha "$SHA" \
             --arg short_sha "$SHORT_SHA" \
             --arg actor "$ACTOR" \
-            --arg branch_ref "${{ needs.stabilize.outputs.branch_ref }}" \
+            --arg branch_ref "${{ github.ref }}" \
             --arg run_id "${{ github.run_id }}" \
             --arg run_number "${{ github.run_number }}" \
             --arg workflow "${{ github.workflow }}" \
