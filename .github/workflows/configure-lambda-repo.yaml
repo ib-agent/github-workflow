@@ -94,6 +94,9 @@ jobs:
       - name: Set Environment developer-admin approval
         run: |
           echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token 
+          gh variable set AWS_ACCOUNT_ID --repo ${{ github.repository }} --env=developer-admin --body="${{ inputs.aws_account_id_dev }}"
+          gh variable set DD_API_KEY_SECRET_ARN --repo ${{ github.repository }} --env=developer-admin --body="${{ inputs.dd_api_key_secret_arn_dev }}"
+          gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=developer-admin --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_dev }}:role/central-admin-GitHubActionsRole"
           team_id=$(gh api \
           -H "Accept: application/vnd.github+json" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -128,6 +131,9 @@ jobs:
       - name: Set Environment production-admin approval
         run: |
           echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token 
+          gh variable set AWS_ACCOUNT_ID --repo ${{ github.repository }} --env=production-admin --body="${{ inputs.aws_account_id_prod }}"
+          gh variable set DD_API_KEY_SECRET_ARN --repo ${{ github.repository }} --env=production-admin --body="${{ inputs.dd_api_key_secret_arn_prod }}"
+          gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=production-admin --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_prod }}:role/central-admin-GitHubActionsRole"
           team_id=$(gh api \
           -H "Accept: application/vnd.github+json" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -164,11 +170,11 @@ jobs:
           echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
           gh variable set AWS_ACCOUNT_ID --repo ${{ github.repository }} --env=development --body="${{ inputs.aws_account_id_dev }}"
           gh variable set DD_API_KEY_SECRET_ARN --repo ${{ github.repository }} --env=development --body="${{ inputs.dd_api_key_secret_arn_dev }}"
-          gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=development --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_dev }}:role/${{ github.event.inputs.project_name }}-GitHubActionsRole"
+          gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=development --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_dev }}:role/central-admin-GitHubActionsRole"
 
       - name: Set Environment Variables for Production
         run: |
           echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
           gh variable set AWS_ACCOUNT_ID --repo ${{ github.repository }} --env=production --body="${{ inputs.aws_account_id_prod }}"
           gh variable set DD_API_KEY_SECRET_ARN --repo ${{ github.repository }} --env=production --body="${{ inputs.dd_api_key_secret_arn_prod }}"
-          gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=production --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_prod }}:role/${{ github.event.inputs.project_name }}-GitHubActionsRole"
+          gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=production --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_prod }}:role/central-admin-GitHubActionsRole"
