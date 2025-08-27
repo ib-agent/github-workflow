@@ -33,7 +33,7 @@ on:
         type: string
       environment_deploy:
         description: 'approval environment, used in terraform deploy'
-        required: false 
+        required: true 
         type: string
         default: 'development'
       service_version:
