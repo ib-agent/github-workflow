@@ -7,6 +7,11 @@ on:
         description: 'The environment to build'
         required: true
         type: string
+      environment_deploy:
+        description: 'The approval environment'
+        required: true
+        type: string
+        default: 'development'
       version:
         description: 'The version to deploy'
         required: true
@@ -33,7 +38,7 @@ permissions:
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: ${{ inputs.environment_deploy }}
     defaults:
       run:
         working-directory: ./${{ inputs.working_dir }}/tf
