@@ -9,7 +9,7 @@ on:
         type: string
       environment_deploy:
         description: 'The approval environment'
-        required: true
+        required: false 
         type: string
         default: 'development'
       version:
