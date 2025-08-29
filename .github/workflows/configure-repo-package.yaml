@@ -7,6 +7,10 @@ on:
         description: 'AWS Account ID for development'
         required: true
         type: string
+      aws_region_dev:
+        description: 'AWS Region for development'
+        required: true
+        type: string
 
 jobs:
   configure:
@@ -73,4 +77,5 @@ jobs:
         run: |
           echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
           gh variable set AWS_ACCOUNT_ID --repo ${{ github.repository }} --env=development --body="${{ inputs.aws_account_id_dev }}"
-          gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=development --body="arn:aws:iam::${{ github.event.inputs.aws_account_id_dev }}:role/${{ github.event.inputs.project_name }}-GitHubActionsRole"
+          gh variable set AWS_REGION --repo ${{ github.repository }} --env=development --body="${{ inputs.aws_region_dev }}"
+          gh variable set ROLE_TO_ASSUME --repo ${{ github.repository }} --env=development --body="arn:aws:iam::${{ inputs.aws_account_id_dev }}:role/central-admin-GitHubActionsRole"
