@@ -86,7 +86,7 @@ jobs:
           IMAGE_TAG: ${{ inputs.version }}
           ENV_TAG: ${{ inputs.env_tag }}
           CODEARTIFACT_AUTH_TOKEN: ${{ steps.codeartifact_token.outputs.token }}
-          CODEARTIFACT_PYPI_URL: https://${{ inputs.artifact_domain }}-${{ inputs.aws_account_id_dev }}.d.codeartifact.${{ inputs.aws_region }}.amazonaws.com/pypi/python/simple/
+          CODEARTIFACT_PYPI_URL: ${{ inputs.artifact_domain }}-${{ inputs.aws_account_id_dev }}.d.codeartifact.${{ inputs.aws_region }}.amazonaws.com/pypi/python/simple/
         run: |
           docker build \
             --build-arg CODEARTIFACT_AUTH_TOKEN=$CODEARTIFACT_AUTH_TOKEN \
