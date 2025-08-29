@@ -50,6 +50,12 @@ jobs:
       - name: Get AWS CodeArtifact Auth Token
         id: codeartifact_auth
         run: |
+          aws codeartifact login \
+            --tool pip \
+            --repository python \
+            --domain ${{ inputs.artifact_domain }} \
+            --domain-owner ${{ inputs.aws_account_id_dev }}
+
           CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token \
             --domain ${{ inputs.artifact_domain }} \
             --domain-owner ${{ inputs.aws_account_id_dev }} \
