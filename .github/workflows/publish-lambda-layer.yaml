@@ -17,6 +17,18 @@ on:
         required: false
         default: ''
         type: string
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      aws_account_id_dev:
+        description: 'AWS Account ID for development'
+        type: string
+        default: '905418256626'
+      artifact_domain:
+        description: 'AWS CodeArtifact domain'
+        type: string
+        default: 'cabernetai'
 
     outputs:
       checksum:
@@ -61,12 +73,31 @@ jobs:
         run: |
           echo "artifact_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
 
+      - name: Get AWS CodeArtifact Auth Token
+        id: codeartifact_auth
+        run: |
+          aws codeartifact login \
+            --tool pip \
+            --repository python \
+            --domain ${{ inputs.artifact_domain }} \
+            --domain-owner ${{ inputs.aws_account_id_dev }}
+
+          CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token \
+            --domain ${{ inputs.artifact_domain }} \
+            --domain-owner ${{ inputs.aws_account_id_dev }} \
+            --region ${{ inputs.aws_region }} \
+            --query authorizationToken \
+            --output text)
+          echo "token=$CODEARTIFACT_AUTH_TOKEN" >> $GITHUB_OUTPUT
+          echo "url=${{ inputs.artifact_domain }}-${{ inputs.aws_account_id_dev }}.d.codeartifact.${{ inputs.aws_region }}.amazonaws.com/pypi/python/simple/" >> $GITHUB_OUTPUT
+
       - name: Check for requirements.txt and install dependencies
         id: check_requirements
         run: |
           if [ -f "requirements.txt" ]; then
             TEMP_DIR=$(mktemp -d)
             mkdir -p $TEMP_DIR/python
+            pip3 config set global.extra-index-url "https://aws:${{ steps.codeartifact_auth.outputs.token }}@${{ steps.codeartifact_auth.outputs.url }}"
             pip3 install --no-cache-dir \
                          --platform manylinux2014_x86_64 \
                          --implementation cp \
