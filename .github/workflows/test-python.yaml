@@ -57,7 +57,7 @@ jobs:
             --query authorizationToken \
             --output text)
           echo "token=$CODEARTIFACT_AUTH_TOKEN" >> $GITHUB_OUTPUT
-          echo "url=${{ inputs.artifact_domain }}-${{ inputs.aws_account_id_dev }}.d.codeartifact.${{ inputs.aws_region }}.amazonaws.com/pypi/python/simple/"
+          echo "url=${{ inputs.artifact_domain }}-${{ inputs.aws_account_id_dev }}.d.codeartifact.${{ inputs.aws_region }}.amazonaws.com/pypi/python/simple/" >> $GITHUB_OUTPUT
 
       - name: Install dependencies
         run: |
