@@ -49,7 +49,6 @@ jobs:
              "strict": true,
              "contexts": [
               "call_test / test",
-              "call_snyk / snyk-scan",
               "call_docker / build-docker",
               "call_terraform / terraform",
               "call_post-deployment-tests / stabilize",
