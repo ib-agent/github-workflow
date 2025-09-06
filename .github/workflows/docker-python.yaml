@@ -31,6 +31,10 @@ on:
         description: 'AWS Account ID for development'
         type: string
         default: '905418256626'
+      artifact_domain:
+        description: 'AWS CodeArtifact domain'
+        type: string
+        default: 'cabernetai'
 
 permissions:
   id-token: write
@@ -58,14 +62,36 @@ jobs:
         with:
           registries: ${{ inputs.aws_account_id_dev }}  # Cross-account ECR registry
 
+      - name: Get AWS CodeArtifact Auth Token
+        id: codeartifact_token
+        run: |
+          aws codeartifact login \
+            --tool pip \
+            --repository python \
+            --domain ${{ inputs.artifact_domain }} \
+            --domain-owner ${{ inputs.aws_account_id_dev }} 
+
+          CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token \
+            --domain ${{ inputs.artifact_domain }} \
+            --domain-owner ${{ inputs.aws_account_id_dev }} \
+            --region ${{ inputs.aws_region }} \
+            --query authorizationToken \
+            --output text)
+          echo "token=$CODEARTIFACT_AUTH_TOKEN" >> $GITHUB_OUTPUT
+
       - name: Build and push Docker image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{inputs.ecr_repository_name}}
           IMAGE_TAG: ${{ inputs.version }}
           ENV_TAG: ${{ inputs.env_tag }}
+          CODEARTIFACT_AUTH_TOKEN: ${{ steps.codeartifact_token.outputs.token }}
+          CODEARTIFACT_PYPI_URL: ${{ inputs.artifact_domain }}-${{ inputs.aws_account_id_dev }}.d.codeartifact.${{ inputs.aws_region }}.amazonaws.com/pypi/python/simple/
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build \
+            --build-arg CODEARTIFACT_AUTH_TOKEN=$CODEARTIFACT_AUTH_TOKEN \
+            --build-arg CODEARTIFACT_PYPI_URL=$CODEARTIFACT_PYPI_URL \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$ENV_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$ENV_TAG

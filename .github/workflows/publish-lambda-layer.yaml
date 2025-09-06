@@ -1,0 +1,159 @@
+name: Publish Lambda Layer
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'The environment to deploy to'
+        required: true
+        type: string
+      working_dir:
+        description: 'The directory of the Lambda function'
+        required: false
+        default: '.'
+        type: string
+      role_to_assume:
+        description: 'the aws role to assume'
+        required: false
+        default: ''
+        type: string
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      aws_account_id_dev:
+        description: 'AWS Account ID for development'
+        type: string
+        default: '905418256626'
+      artifact_domain:
+        description: 'AWS CodeArtifact domain'
+        type: string
+        default: 'cabernetai'
+
+    outputs:
+      checksum:
+        description: "The checksum of the artifact"
+        value: ${{ jobs.upload.outputs.checksum }}
+
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+
+  layer:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working_dir }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set role if not provided
+        id: set_role
+        run: |
+          if [ -z "${{ inputs.role_to_assume }}" ]; then
+            echo "role=${{ vars.ROLE_TO_ASSUME }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "role=${{ inputs.role_to_assume }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.set_role.outputs.role }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Set artifact name
+        id: set_artifact_name
+        run: |
+          echo "artifact_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+
+      - name: Get AWS CodeArtifact Auth Token
+        id: codeartifact_auth
+        run: |
+          aws codeartifact login \
+            --tool pip \
+            --repository python \
+            --domain ${{ inputs.artifact_domain }} \
+            --domain-owner ${{ inputs.aws_account_id_dev }}
+
+          CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token \
+            --domain ${{ inputs.artifact_domain }} \
+            --domain-owner ${{ inputs.aws_account_id_dev }} \
+            --region ${{ inputs.aws_region }} \
+            --query authorizationToken \
+            --output text)
+          echo "token=$CODEARTIFACT_AUTH_TOKEN" >> $GITHUB_OUTPUT
+          echo "url=${{ inputs.artifact_domain }}-${{ inputs.aws_account_id_dev }}.d.codeartifact.${{ inputs.aws_region }}.amazonaws.com/pypi/python/simple/" >> $GITHUB_OUTPUT
+
+      - name: Check for requirements.txt and install dependencies
+        id: check_requirements
+        run: |
+          if [ -f "requirements.txt" ]; then
+            TEMP_DIR=$(mktemp -d)
+            mkdir -p $TEMP_DIR/python
+            pip3 config set global.extra-index-url "https://aws:${{ steps.codeartifact_auth.outputs.token }}@${{ steps.codeartifact_auth.outputs.url }}"
+            pip3 install --no-cache-dir \
+                         --platform manylinux2014_x86_64 \
+                         --implementation cp \
+                         --python-version 3.12 \
+                         --only-binary=:all: \
+                         -r requirements.txt -t $TEMP_DIR/python 
+
+            find $TEMP_DIR/python/ -name '*.txt'      -type f -delete
+            find $TEMP_DIR/python/ -name '*.md'       -type f -delete
+            find $TEMP_DIR/python/ -name 'tests'      -type d | xargs rm -rf
+            find $TEMP_DIR/python/ -name '*.dist-info' -type d | xargs rm -rf
+            find $TEMP_DIR/python/ -name '__pycache__' -type d | xargs rm -rf
+            find $TEMP_DIR/python/ -name '*.pyc'      -type f -delete     
+
+            cd $TEMP_DIR
+            zip -r ../${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip .
+            cp -v ../${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip ${GITHUB_WORKSPACE}
+            rm -rf $TEMP_DIR
+
+            echo "Layer created and zipped as ${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip" 
+            echo "layer_created=true" >> $GITHUB_OUTPUT 
+          else
+            echo "No requirements.txt found. Skipping layer creation."
+          fi
+
+      - name: Upload Lambda layer zip to S3 (if created)
+        if: success() && steps.check_requirements.outputs.layer_created == 'true'
+        run: |
+          aws s3 cp ${GITHUB_WORKSPACE}/${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip s3://${{ vars.LAMBDA_BUCKET_PREFIX}}-${{ vars.AWS_ACCOUNT_ID}}/${{ steps.set_artifact_name.outputs.artifact_name }}/${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip
+
+      - name: Publish Lambda layer version
+        env:
+          WORKING_DIR: ${{ inputs.working_dir }}
+        run: |
+          zip_file="${GITHUB_WORKSPACE}/${{ steps.set_artifact_name.outputs.artifact_name }}-layer.zip"
+          lambda_name="${{ steps.set_artifact_name.outputs.artifact_name }}"
+          aws lambda publish-layer-version \
+            --layer-name "$lambda_name-layer" \
+            --description "Lambda layer for $lambda_name dependencies" \
+            --compatible-runtimes python3.12 \
+            --zip-file fileb://$zip_file
+
+      - name: Prune old layer versions
+        if: steps.check_requirements.outputs.layer_created == 'true'
+        run: |
+          lambda_name="${{ steps.set_artifact_name.outputs.artifact_name }}"
+          
+          # 1. Get versions beyond the 10 newest
+          to_delete=$(aws lambda list-layer-versions \
+            --layer-name "$lambda_name-layer" \
+            --query 'LayerVersions[10:].Version' \
+            --output text)
+          
+          # 2. Delete each old version
+          for v in $to_delete; do
+            aws lambda delete-layer-version \
+              --layer-name "$lambda_name-layer" \
+              --version-number $v
+          done

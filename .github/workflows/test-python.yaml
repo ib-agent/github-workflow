@@ -8,6 +8,26 @@ on:
         description: 'Python version to use'
         required: false
         default: '3.12'  # Set the default to Python 3.12
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        type: string
+      role_to_assume:
+        description: 'AWS Role to Assume'
+        required: true
+        type: string
+      aws_account_id_dev:
+        description: 'AWS Account ID for development'
+        type: string
+        default: '905418256626'
+      artifact_domain:
+        description: 'AWS CodeArtifact domain'
+        type: string
+        default: 'cabernetai'
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   test:
@@ -21,9 +41,34 @@ jobs:
         with:
           python-version: ${{ inputs.python_version }}
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.role_to_assume }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Get AWS CodeArtifact Auth Token
+        id: codeartifact_auth
+        run: |
+          aws codeartifact login \
+            --tool pip \
+            --repository python \
+            --domain ${{ inputs.artifact_domain }} \
+            --domain-owner ${{ inputs.aws_account_id_dev }}
+
+          CODEARTIFACT_AUTH_TOKEN=$(aws codeartifact get-authorization-token \
+            --domain ${{ inputs.artifact_domain }} \
+            --domain-owner ${{ inputs.aws_account_id_dev }} \
+            --region ${{ inputs.aws_region }} \
+            --query authorizationToken \
+            --output text)
+          echo "token=$CODEARTIFACT_AUTH_TOKEN" >> $GITHUB_OUTPUT
+          echo "url=${{ inputs.artifact_domain }}-${{ inputs.aws_account_id_dev }}.d.codeartifact.${{ inputs.aws_region }}.amazonaws.com/pypi/python/simple/" >> $GITHUB_OUTPUT
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip config set global.extra-index-url "https://aws:${{ steps.codeartifact_auth.outputs.token }}@${{ steps.codeartifact_auth.outputs.url }}"
           pip install -r requirements.txt
           pip install -r tests/requirements_test.txt
 

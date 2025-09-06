@@ -31,6 +31,11 @@ on:
         description: 'environment, used in dd tags'
         required: true
         type: string
+      environment_deploy:
+        description: 'approval environment, used in terraform deploy'
+        required: false 
+        type: string
+        default: 'development'
       service_version:
         description: 'version, used in dd tags'
         required: true
@@ -42,6 +47,7 @@ permissions:
 
 jobs:
   terraform:
+    environment: ${{ inputs.environment_deploy }} 
     runs-on: ubuntu-latest
     defaults:
       run:

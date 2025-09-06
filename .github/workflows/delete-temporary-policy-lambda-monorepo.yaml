@@ -40,6 +40,18 @@ jobs:
           PROJECT_NAME: ${{ inputs.project_name }}
         run: |
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
+          admin_policy_arn="arn:aws:iam::aws:policy/AdministratorAccess"
+
+          # Detach AdministratorAccess if attached
+          attached_policies=$(aws iam list-attached-role-policies --role-name "$github_action_role" --query "AttachedPolicies[].PolicyArn" --output text)
+          if echo "$attached_policies" | grep -q "$admin_policy_arn"; then
+            echo "[INFO] Detaching $admin_policy_arn from $github_action_role"
+            aws iam detach-role-policy --role-name "$github_action_role" --policy-arn "$admin_policy_arn"
+          else
+            echo "[INFO] AdministratorAccess policy not attached. Skipping detach."
+          fi
+
+          # Existing logic for deleting temporary policies:
           temporary_policy_arn=$(aws iam list-attached-role-policies --role-name $github_action_role --query "AttachedPolicies[?contains(PolicyName, 'temporary-')].PolicyArn" --output text)
           for policy_arn in $temporary_policy_arn; do
             echo "[INFO] Detach $policy_arn to $github_action_role"
@@ -47,4 +59,4 @@ jobs:
 
             echo "[INFO] Delete $policy_arn"
             aws iam delete-policy --policy-arn $policy_arn
-          done
+          done 
