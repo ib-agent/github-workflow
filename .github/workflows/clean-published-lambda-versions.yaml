@@ -1,0 +1,159 @@
+name: Cleanup Unused Published Lambda Versions
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Environment for AWS creds/vars"
+        required: true
+        type: string
+      working_dir:
+        description: "Directory of the Lambda function (used to infer Lambda name)"
+        required: false
+        default: "."
+        type: string
+      role_to_assume:
+        description: "AWS role to assume"
+        required: false
+        default: ""
+        type: string
+      dry_run:
+        description: "If true, only print what would be deleted"
+        required: false
+        default: "false"
+        type: string
+      retention_unused_versions:
+        description: "Keep this many newest UNUSED versions"
+        required: false
+        default: "0"
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working_dir }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set role if not provided
+        id: set_role
+        run: |
+          if [ -z "${{ inputs.role_to_assume }}" ]; then
+            echo "role=${{ vars.ROLE_TO_ASSUME }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "role=${{ inputs.role_to_assume }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.set_role.outputs.role }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Set artifact name based on working directory (Lambda name)
+        id: set_artifact_name
+        run: |
+          if [ "${{ inputs.working_dir }}" = "." ]; then
+            echo "artifact_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+          else
+            ARTIFACT_NAME=$(basename "${{ inputs.working_dir }}")
+            echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cleanup unused published Lambda versions
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          LAMBDA_NAME: ${{ steps.set_artifact_name.outputs.artifact_name }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          RETAIN: ${{ inputs.retention_unused_versions }}
+        run: |
+          set -euo pipefail
+
+          echo "Lambda cleanup:"
+          echo "  Lambda Name: ${LAMBDA_NAME}"
+          echo "  Dry Run    : ${DRY_RUN}"
+          echo "  Retention  : ${RETAIN}"
+
+          FN_ARN=$(aws lambda get-function --function-name "${LAMBDA_NAME}" --query 'Configuration.FunctionArn' --output text 2>/dev/null || true)
+          if [[ -z "${FN_ARN}" || "${FN_ARN}" == "None" ]]; then
+            echo "Lambda ${LAMBDA_NAME} not found; nothing to do."
+            exit 0
+          fi
+
+          # All published versions (exclude $LATEST), collect version + last modified
+          mapfile -t VERSIONS < <(aws lambda list-versions-by-function --function-name "${LAMBDA_NAME}" \
+            --query 'Versions[?Version!=`$LATEST`].{v:Version,ts:LastModified}' --output text \
+            | awk '{print $1"\t"$2}')
+
+          if [[ ${#VERSIONS[@]} -eq 0 ]]; then
+            echo "No published Lambda versions found."
+            exit 0
+          fi
+
+          # Versions pointed by aliases
+          mapfile -t IN_USE_BY_ALIAS < <(aws lambda list-aliases --function-name "${LAMBDA_NAME}" \
+            --query 'Aliases[].FunctionVersion' --output text | tr '\t' '\n' | sed '/^$/d')
+
+          # Versions with provisioned concurrency
+          mapfile -t IN_USE_BY_PC < <(aws lambda list-provisioned-concurrency-configs --function-name "${LAMBDA_NAME}" \
+            --query 'ProvisionedConcurrencyConfigs[].Qualifier' --output text | tr '\t' '\n' | sed '/^$/d')
+
+          # Versions referenced by event source mappings (FunctionArn ends with :<qualifier>)
+          mapfile -t IN_USE_BY_ESM < <(aws lambda list-event-source-mappings --function-name "${LAMBDA_NAME}" \
+            --query 'EventSourceMappings[].FunctionArn' --output text | tr '\t' '\n' | sed '/^$/d')
+          mapfile -t IN_USE_BY_ESM_VER < <(printf '%s\n' "${IN_USE_BY_ESM[@]:-}" | awk -F: '/:function:/ {print $NF}' | sed '/^\(function\|$LATEST\)$/d' || true)
+
+          echo "Alias-targeted versions: ${IN_USE_BY_ALIAS[*]:-<none>}"
+          echo "Prov. concurrency vers : ${IN_USE_BY_PC[*]:-<none>}"
+          echo "ESM-referenced vers    : ${IN_USE_BY_ESM_VER[*]:-<none>}"
+
+          # Build protected set
+          PROTECTED=$(printf '%s\n' "${IN_USE_BY_ALIAS[@]:-}" "${IN_USE_BY_PC[@]:-}" "${IN_USE_BY_ESM_VER[@]:-}" | sed '/^$/d' | sort -u || true)
+
+          # Sort all versions by last modified desc; split to arrays
+          mapfile -t SORTED < <(printf '%s\n' "${VERSIONS[@]}" | sort -k2,2r)
+          mapfile -t ALL_VERS < <(printf '%s\n' "${SORTED[@]}" | awk '{print $1}')
+
+          # Unused = not in PROTECTED
+          mapfile -t UNUSED < <(
+            if [[ -n "${PROTECTED}" ]]; then
+              printf '%s\n' "${ALL_VERS[@]}" | grep -v -F -x -f <(printf '%s\n' ${PROTECTED}) || true
+            else
+              printf '%s\n' "${ALL_VERS[@]}"
+            fi
+          )
+
+          # Apply retention to UNUSED: keep newest $RETAIN
+          if [[ "${RETAIN}" =~ ^[0-9]+$ ]] && [[ "${RETAIN}" -gt 0 ]]; then
+            mapfile -t UNUSED_SORTED < <(
+              join -1 1 -2 1 <(printf '%s\n' "${UNUSED[@]}" | sort) <(printf '%s\n' "${SORTED[@]}" | sort) | sort -k2,2r
+            )
+            mapfile -t DELETABLE < <(printf '%s\n' "${UNUSED_SORTED[@]}" | tail -n +$((RETAIN+1)) | awk '{print $1}')
+          else
+            mapfile -t DELETABLE < <(printf '%s\n' "${UNUSED[@]}")
+          fi
+
+          echo "Deletable Lambda versions: ${DELETABLE[*]:-<none>}"
+          if [[ -z "${DELETABLE[*]:-}" ]]; then
+            echo "Nothing to delete."
+            exit 0
+          fi
+
+          for ver in "${DELETABLE[@]}"; do
+            if [[ "${DRY_RUN}" == "true" ]]; then
+              echo "[DRY RUN] Would delete ${LAMBDA_NAME}:${ver}"
+            else
+              echo "Deleting ${LAMBDA_NAME}:${ver}"
+              aws lambda delete-function --function-name "${LAMBDA_NAME}" --qualifier "${ver}"
+            fi
+          done
