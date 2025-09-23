@@ -30,6 +30,18 @@ on:
         required: false
         default: ''
         type: string
+      allow_publish_lambda:
+        required: true 
+        type: boolean
+        default: false
+      create_lambda_snapshot:
+        required: true 
+        type: boolean
+        default: false
+      lambda_alias_mode:
+        required: true
+        type: string 
+        default: ""
 
 permissions:
   id-token: write
@@ -133,6 +145,9 @@ jobs:
           TF_VAR_lambda_version: ${{ inputs.version }}
           TF_VAR_lambda_checksum: ${{ inputs.checksum }}
           TF_VAR_previous_lambda_version: ${{ steps.snapshot.outputs.previous_lambda_version }}
+          TF_VAR_allow_publish_lambda: ${{ inputs.allow_publish_lambda }}
+          TF_VAR_create_lambda_snapshot: ${{ inputs.create_lambda_snapshot }}
+          TF_VAR_lambda_alias_mode: ${{ inputs.lambda_alias_mode }}
 
       - name: Terraform Apply
         if: steps.plan.outputs.exitcode == '2'
