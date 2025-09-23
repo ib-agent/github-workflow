@@ -31,15 +31,15 @@ on:
         default: ''
         type: string
       allow_publish_lambda:
-        required: true 
+        required: false 
         type: boolean
         default: false
       create_lambda_snapshot:
-        required: true 
+        required: false 
         type: boolean
         default: false
       lambda_alias_mode:
-        required: true
+        required: false 
         type: string 
         default: ""
 
