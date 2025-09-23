@@ -92,6 +92,34 @@ jobs:
             echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
           fi
 
+      - name: Detect aliases and compute snapshot flags
+        id: snapshot
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: |
+          set -euo pipefail
+          FN="${{ steps.set_artifact_name.outputs.artifact_name }}"
+
+          # Check Lambda aliases
+          set +e
+          aws lambda get-alias --function-name "$FN" --name previous >/dev/null 2>&1
+          HAS_LAMBDA_PREV=$?
+          set -e
+
+          # Get current LIVE version (after last successful deploy)
+          LIVE_VER=$(aws lambda get-alias --function-name "$FN" --name live --query 'FunctionVersion' --output text 2>/dev/null || echo "")
+
+          CREATE_PREV="false"
+          PREV_VER=""
+
+          if [ "$HAS_LAMBDA_PREV" -ne 0 ] && [ -n "$LIVE_VER" ] && [ "$LIVE_VER" != "null" ]; then
+            CREATE_PREV="true"
+            PREV_VER="$LIVE_VER"
+          fi
+
+          echo "create_lambda_snapshot=$CREATE_PREV" >> "$GITHUB_OUTPUT"
+          echo "previous_lambda_version=$PREV_VER" >> "$GITHUB_OUTPUT"
+
       - name: Terraform Plan
         id: plan
         run: terraform plan -detailed-exitcode -out=plan.tfplan
@@ -105,6 +133,8 @@ jobs:
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_lambda_version: ${{ inputs.version }}
           TF_VAR_lambda_checksum: ${{ inputs.checksum }}
+          TF_VAR_create_lambda_snapshot: ${{ steps.snapshot.outputs.create_lambda_snapshot }}
+          TF_VAR_previous_lambda_version: ${{ steps.snapshot.outputs.previous_lambda_version }}
 
       - name: Terraform Apply
         if: steps.plan.outputs.exitcode == '2'
@@ -119,3 +149,5 @@ jobs:
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_lambda_version: ${{ inputs.version }}
           TF_VAR_lambda_checksum: ${{ inputs.checksum }}
+          TF_VAR_create_lambda_snapshot: ${{ steps.snapshot.outputs.create_lambda_snapshot }}
+          TF_VAR_previous_lambda_version: ${{ steps.snapshot.outputs.previous_lambda_version }}
