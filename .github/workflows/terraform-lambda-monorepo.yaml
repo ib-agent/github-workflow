@@ -92,7 +92,7 @@ jobs:
             echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
           fi
 
-      - name: Detect aliases and compute snapshot flags
+      - name: Detect lambda snapshot alias
         id: snapshot
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
@@ -100,25 +100,24 @@ jobs:
           set -euo pipefail
           FN="${{ steps.set_artifact_name.outputs.artifact_name }}"
 
-          # Check Lambda aliases
-          set +e
-          aws lambda get-alias --function-name "$FN" --name previous >/dev/null 2>&1
-          HAS_LAMBDA_PREV=$?
-          set -e
+          # Try to read the 'previous' alias (case-sensitive)
+          PREV_VER="$(aws lambda get-alias \
+            --function-name "$FN" \
+            --name previous \
+            --query 'FunctionVersion' \
+            --output text 2>/dev/null || echo '')"
 
-          # Get current LIVE version (after last successful deploy)
-          LIVE_VER=$(aws lambda get-alias --function-name "$FN" --name live --query 'FunctionVersion' --output text 2>/dev/null || echo "")
-
-          CREATE_PREV="false"
-          PREV_VER=""
-
-          if [ "$HAS_LAMBDA_PREV" -ne 0 ] && [ -n "$LIVE_VER" ] && [ "$LIVE_VER" != "null" ]; then
-            CREATE_PREV="true"
-            PREV_VER="$LIVE_VER"
+          # Sanity checks: only pass a numeric version
+          # (ignore empty, null, or $LATEST which would break pinning)
+          if [ -n "${PREV_VER}" ] && [ "${PREV_VER}" != "None" ] && [ "${PREV_VER}" != "null" ] && [ "${PREV_VER}" != "\$LATEST" ]; then
+            echo "previous_lambda_version=${PREV_VER}"
+            echo "previous_lambda_version=${PREV_VER}" >> "$GITHUB_OUTPUT"
+            echo "Found PREVIOUS alias version: ${PREV_VER}"
+          else
+            echo "previous_lambda_version=${PREV_VER}"
+            echo "previous_lambda_version=" >> "$GITHUB_OUTPUT"
+            echo "No valid PREVIOUS alias found"
           fi
-
-          echo "create_lambda_snapshot=$CREATE_PREV" >> "$GITHUB_OUTPUT"
-          echo "previous_lambda_version=$PREV_VER" >> "$GITHUB_OUTPUT"
 
       - name: Terraform Plan
         id: plan
@@ -133,7 +132,6 @@ jobs:
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_lambda_version: ${{ inputs.version }}
           TF_VAR_lambda_checksum: ${{ inputs.checksum }}
-          TF_VAR_create_lambda_snapshot: ${{ steps.snapshot.outputs.create_lambda_snapshot }}
           TF_VAR_previous_lambda_version: ${{ steps.snapshot.outputs.previous_lambda_version }}
 
       - name: Terraform Apply
@@ -149,5 +147,4 @@ jobs:
           TF_VAR_environment: ${{ inputs.environment }}
           TF_VAR_lambda_version: ${{ inputs.version }}
           TF_VAR_lambda_checksum: ${{ inputs.checksum }}
-          TF_VAR_create_lambda_snapshot: ${{ steps.snapshot.outputs.create_lambda_snapshot }}
           TF_VAR_previous_lambda_version: ${{ steps.snapshot.outputs.previous_lambda_version }}
