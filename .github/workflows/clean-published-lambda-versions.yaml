@@ -69,8 +69,7 @@ jobs:
             ARTIFACT_NAME=$(basename "${{ inputs.working_dir }}")
             echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
           fi
-
-      - name: Cleanup unused published Lambda versions
+      - name: Cleanup old Lambda versions
         env:
           AWS_REGION: ${{ vars.AWS_REGION }}
           LAMBDA_NAME: ${{ steps.set_artifact_name.outputs.artifact_name }}
@@ -90,61 +89,80 @@ jobs:
             exit 0
           fi
 
-          # All published versions (exclude $LATEST), collect version + last modified
+          # 1) Get all published versions as "version<TAB>lastModified"
+          #    Using list-of-lists ensures first column is Version, second is LastModified.
           mapfile -t VERSIONS < <(aws lambda list-versions-by-function --function-name "${LAMBDA_NAME}" \
-            --query 'Versions[?Version!=`$LATEST`].{v:Version,ts:LastModified}' --output text \
-            | awk '{print $1"\t"$2}')
+            --query 'Versions[?Version!=`$LATEST`].[Version,LastModified]' --output text | sed '/^\s*$/d')
 
           if [[ ${#VERSIONS[@]} -eq 0 ]]; then
             echo "No published Lambda versions found."
             exit 0
           fi
 
-          # Versions pointed by aliases
+          # Build a version->timestamp map and the full list of version numbers
+          declare -A VER_TS=()
+          ALL_VERSIONS=()
+          while IFS=$'\t' read -r VER TS; do
+            # keep only numeric versions (aliases never appear here, but be safe)
+            if [[ "$VER" =~ ^[0-9]+$ ]]; then
+              VER_TS["$VER"]="$TS"
+              ALL_VERSIONS+=("$VER")
+            fi
+          done < <(printf '%s\n' "${VERSIONS[@]}")
+
+          if [[ ${#ALL_VERSIONS[@]} -eq 0 ]]; then
+            echo "No numeric published versions found."
+            exit 0
+          fi
+
+          # 2) Versions referenced by aliases / provisioned concurrency / event source mappings
           mapfile -t IN_USE_BY_ALIAS < <(aws lambda list-aliases --function-name "${LAMBDA_NAME}" \
-            --query 'Aliases[].FunctionVersion' --output text | tr '\t' '\n' | sed '/^$/d')
-
-          # Versions with provisioned concurrency
+            --query 'Aliases[].FunctionVersion' --output text | tr '\t' '\n' | sed '/^$/d' | sort -u)
           mapfile -t IN_USE_BY_PC < <(aws lambda list-provisioned-concurrency-configs --function-name "${LAMBDA_NAME}" \
-            --query 'ProvisionedConcurrencyConfigs[].Qualifier' --output text | tr '\t' '\n' | sed '/^$/d')
-
-          # Versions referenced by event source mappings (FunctionArn ends with :<qualifier>)
+            --query 'ProvisionedConcurrencyConfigs[].Qualifier' --output text | tr '\t' '\n' | sed '/^$/d' | sort -u)
           mapfile -t IN_USE_BY_ESM < <(aws lambda list-event-source-mappings --function-name "${LAMBDA_NAME}" \
             --query 'EventSourceMappings[].FunctionArn' --output text | tr '\t' '\n' | sed '/^$/d')
-          mapfile -t IN_USE_BY_ESM_VER < <(printf '%s\n' "${IN_USE_BY_ESM[@]:-}" | awk -F: '/:function:/ {print $NF}' | sed '/^\(function\|$LATEST\)$/d' || true)
+
+          # Extract numeric qualifier (last segment) from ESM ARNs
+          mapfile -t IN_USE_BY_ESM_VER < <(printf '%s\n' "${IN_USE_BY_ESM[@]:-}" | awk -F: '/:function:/ {print $NF}' | sed -E 's/^function$//; s/^\$LATEST$//' | sed '/^$/d' | sort -u)
 
           echo "Alias-targeted versions: ${IN_USE_BY_ALIAS[*]:-<none>}"
           echo "Prov. concurrency vers : ${IN_USE_BY_PC[*]:-<none>}"
           echo "ESM-referenced vers    : ${IN_USE_BY_ESM_VER[*]:-<none>}"
 
-          # Build protected set
-          PROTECTED=$(printf '%s\n' "${IN_USE_BY_ALIAS[@]:-}" "${IN_USE_BY_PC[@]:-}" "${IN_USE_BY_ESM_VER[@]:-}" | sed '/^$/d' | sort -u || true)
+          # Build a PROTECTED set with only numeric entries
+          PROTECTED_TMP=$(printf '%s\n' "${IN_USE_BY_ALIAS[@]:-}" "${IN_USE_BY_PC[@]:-}" "${IN_USE_BY_ESM_VER[@]:-}" \
+            | sed -n '/^[0-9]\+$/p' | sort -u || true)
 
-          # Sort all versions by last modified desc; split to arrays
-          mapfile -t SORTED < <(printf '%s\n' "${VERSIONS[@]}" | sort -k2,2r)
-          mapfile -t ALL_VERS < <(printf '%s\n' "${SORTED[@]}" | awk '{print $1}')
+          # 3) UNUSED = ALL_VERSIONS - PROTECTED
+          if [[ -n "${PROTECTED_TMP}" ]]; then
+            mapfile -t UNUSED < <(printf '%s\n' "${ALL_VERSIONS[@]}" | grep -v -F -x -f <(printf '%s\n' ${PROTECTED_TMP}) || true)
+          else
+            mapfile -t UNUSED < <(printf '%s\n' "${ALL_VERSIONS[@]}")
+          fi
 
-          # Unused = not in PROTECTED
-          mapfile -t UNUSED < <(
-            if [[ -n "${PROTECTED}" ]]; then
-              printf '%s\n' "${ALL_VERS[@]}" | grep -v -F -x -f <(printf '%s\n' ${PROTECTED}) || true
-            else
-              printf '%s\n' "${ALL_VERS[@]}"
-            fi
+          if [[ ${#UNUSED[@]} -eq 0 ]]; then
+            echo "No UNUSED published versions."
+            exit 0
+          fi
+
+          # 4) Apply retention on UNUSED by newest timestamp
+          #    Build "VER<TAB>TS" rows for UNUSED, sort by TS desc, then drop newest $RETAIN
+          mapfile -t UNUSED_WITH_TS < <(
+            for v in "${UNUSED[@]}"; do
+              printf '%s\t%s\n' "$v" "${VER_TS[$v]}"
+            done | sort -k2,2r
           )
 
-          # Apply retention to UNUSED: keep newest $RETAIN
           if [[ "${RETAIN}" =~ ^[0-9]+$ ]] && [[ "${RETAIN}" -gt 0 ]]; then
-            mapfile -t UNUSED_SORTED < <(
-              join -1 1 -2 1 <(printf '%s\n' "${UNUSED[@]}" | sort) <(printf '%s\n' "${SORTED[@]}" | sort) | sort -k2,2r
-            )
-            mapfile -t DELETABLE < <(printf '%s\n' "${UNUSED_SORTED[@]}" | tail -n +$((RETAIN+1)) | awk '{print $1}')
+            mapfile -t DELETABLE < <(printf '%s\n' "${UNUSED_WITH_TS[@]}" | tail -n +$((RETAIN+1)) | awk -F'\t' '{print $1}')
           else
-            mapfile -t DELETABLE < <(printf '%s\n' "${UNUSED[@]}")
+            mapfile -t DELETABLE < <(printf '%s\n' "${UNUSED_WITH_TS[@]}" | awk -F'\t' '{print $1}')
           fi
 
           echo "Deletable Lambda versions: ${DELETABLE[*]:-<none>}"
-          if [[ -z "${DELETABLE[*]:-}" ]]; then
+
+          if [[ ${#DELETABLE[@]} -eq 0 ]]; then
             echo "Nothing to delete."
             exit 0
           fi
