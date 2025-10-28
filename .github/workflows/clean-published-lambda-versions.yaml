@@ -1,0 +1,177 @@
+name: Cleanup Unused Published Lambda Versions
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Environment for AWS creds/vars"
+        required: true
+        type: string
+      working_dir:
+        description: "Directory of the Lambda function (used to infer Lambda name)"
+        required: false
+        default: "."
+        type: string
+      role_to_assume:
+        description: "AWS role to assume"
+        required: false
+        default: ""
+        type: string
+      dry_run:
+        description: "If true, only print what would be deleted"
+        required: false
+        default: "false"
+        type: string
+      retention_unused_versions:
+        description: "Keep this many newest UNUSED versions"
+        required: false
+        default: "0"
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working_dir }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set role if not provided
+        id: set_role
+        run: |
+          if [ -z "${{ inputs.role_to_assume }}" ]; then
+            echo "role=${{ vars.ROLE_TO_ASSUME }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "role=${{ inputs.role_to_assume }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.set_role.outputs.role }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Set artifact name based on working directory (Lambda name)
+        id: set_artifact_name
+        run: |
+          if [ "${{ inputs.working_dir }}" = "." ]; then
+            echo "artifact_name=${{ github.event.repository.name }}" >> $GITHUB_OUTPUT
+          else
+            ARTIFACT_NAME=$(basename "${{ inputs.working_dir }}")
+            echo "artifact_name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          fi
+      - name: Cleanup old Lambda versions
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          LAMBDA_NAME: ${{ steps.set_artifact_name.outputs.artifact_name }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          RETAIN: ${{ inputs.retention_unused_versions }}
+        run: |
+          set -euo pipefail
+
+          echo "Lambda cleanup:"
+          echo "  Lambda Name: ${LAMBDA_NAME}"
+          echo "  Dry Run    : ${DRY_RUN}"
+          echo "  Retention  : ${RETAIN}"
+
+          FN_ARN=$(aws lambda get-function --function-name "${LAMBDA_NAME}" --query 'Configuration.FunctionArn' --output text 2>/dev/null || true)
+          if [[ -z "${FN_ARN}" || "${FN_ARN}" == "None" ]]; then
+            echo "Lambda ${LAMBDA_NAME} not found; nothing to do."
+            exit 0
+          fi
+
+          # 1) Get all published versions as "version<TAB>lastModified"
+          #    Using list-of-lists ensures first column is Version, second is LastModified.
+          mapfile -t VERSIONS < <(aws lambda list-versions-by-function --function-name "${LAMBDA_NAME}" \
+            --query 'Versions[?Version!=`$LATEST`].[Version,LastModified]' --output text | sed '/^\s*$/d')
+
+          if [[ ${#VERSIONS[@]} -eq 0 ]]; then
+            echo "No published Lambda versions found."
+            exit 0
+          fi
+
+          # Build a version->timestamp map and the full list of version numbers
+          declare -A VER_TS=()
+          ALL_VERSIONS=()
+          while IFS=$'\t' read -r VER TS; do
+            # keep only numeric versions (aliases never appear here, but be safe)
+            if [[ "$VER" =~ ^[0-9]+$ ]]; then
+              VER_TS["$VER"]="$TS"
+              ALL_VERSIONS+=("$VER")
+            fi
+          done < <(printf '%s\n' "${VERSIONS[@]}")
+
+          if [[ ${#ALL_VERSIONS[@]} -eq 0 ]]; then
+            echo "No numeric published versions found."
+            exit 0
+          fi
+
+          # 2) Versions referenced by aliases / provisioned concurrency / event source mappings
+          mapfile -t IN_USE_BY_ALIAS < <(aws lambda list-aliases --function-name "${LAMBDA_NAME}" \
+            --query 'Aliases[].FunctionVersion' --output text | tr '\t' '\n' | sed '/^$/d' | sort -u)
+          mapfile -t IN_USE_BY_PC < <(aws lambda list-provisioned-concurrency-configs --function-name "${LAMBDA_NAME}" \
+            --query 'ProvisionedConcurrencyConfigs[].Qualifier' --output text | tr '\t' '\n' | sed '/^$/d' | sort -u)
+          mapfile -t IN_USE_BY_ESM < <(aws lambda list-event-source-mappings --function-name "${LAMBDA_NAME}" \
+            --query 'EventSourceMappings[].FunctionArn' --output text | tr '\t' '\n' | sed '/^$/d')
+
+          # Extract numeric qualifier (last segment) from ESM ARNs
+          mapfile -t IN_USE_BY_ESM_VER < <(printf '%s\n' "${IN_USE_BY_ESM[@]:-}" | awk -F: '/:function:/ {print $NF}' | sed -E 's/^function$//; s/^\$LATEST$//' | sed '/^$/d' | sort -u)
+
+          echo "Alias-targeted versions: ${IN_USE_BY_ALIAS[*]:-<none>}"
+          echo "Prov. concurrency vers : ${IN_USE_BY_PC[*]:-<none>}"
+          echo "ESM-referenced vers    : ${IN_USE_BY_ESM_VER[*]:-<none>}"
+
+          # Build a PROTECTED set with only numeric entries
+          PROTECTED_TMP=$(printf '%s\n' "${IN_USE_BY_ALIAS[@]:-}" "${IN_USE_BY_PC[@]:-}" "${IN_USE_BY_ESM_VER[@]:-}" \
+            | sed -n '/^[0-9]\+$/p' | sort -u || true)
+
+          # 3) UNUSED = ALL_VERSIONS - PROTECTED
+          if [[ -n "${PROTECTED_TMP}" ]]; then
+            mapfile -t UNUSED < <(printf '%s\n' "${ALL_VERSIONS[@]}" | grep -v -F -x -f <(printf '%s\n' ${PROTECTED_TMP}) || true)
+          else
+            mapfile -t UNUSED < <(printf '%s\n' "${ALL_VERSIONS[@]}")
+          fi
+
+          if [[ ${#UNUSED[@]} -eq 0 ]]; then
+            echo "No UNUSED published versions."
+            exit 0
+          fi
+
+          # 4) Apply retention on UNUSED by newest timestamp
+          #    Build "VER<TAB>TS" rows for UNUSED, sort by TS desc, then drop newest $RETAIN
+          mapfile -t UNUSED_WITH_TS < <(
+            for v in "${UNUSED[@]}"; do
+              printf '%s\t%s\n' "$v" "${VER_TS[$v]}"
+            done | sort -k2,2r
+          )
+
+          if [[ "${RETAIN}" =~ ^[0-9]+$ ]] && [[ "${RETAIN}" -gt 0 ]]; then
+            mapfile -t DELETABLE < <(printf '%s\n' "${UNUSED_WITH_TS[@]}" | tail -n +$((RETAIN+1)) | awk -F'\t' '{print $1}')
+          else
+            mapfile -t DELETABLE < <(printf '%s\n' "${UNUSED_WITH_TS[@]}" | awk -F'\t' '{print $1}')
+          fi
+
+          echo "Deletable Lambda versions: ${DELETABLE[*]:-<none>}"
+
+          if [[ ${#DELETABLE[@]} -eq 0 ]]; then
+            echo "Nothing to delete."
+            exit 0
+          fi
+
+          for ver in "${DELETABLE[@]}"; do
+            if [[ "${DRY_RUN}" == "true" ]]; then
+              echo "[DRY RUN] Would delete ${LAMBDA_NAME}:${ver}"
+            else
+              echo "Deleting ${LAMBDA_NAME}:${ver}"
+              aws lambda delete-function --function-name "${LAMBDA_NAME}" --qualifier "${ver}"
+            fi
+          done
