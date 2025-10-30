@@ -101,6 +101,14 @@ jobs:
           REACT_APP_SERVICE_NAME: ${{ inputs.react_app_service_name }}
           REACT_APP_COGNITO_IDENTITY_POOL_ID: ${{ inputs.user_pool_id }}
           REACT_APP_COGNITO_APP_CLIENT_ID: ${{ inputs.user_pool_client_id }}
+          VITE_DATADOG_CLIENT_TOKEN: ${{ inputs.react_app_datadog_client_token }}
+          VITE_DATADOG_APPLICATION_ID: ${{ inputs.react_app_datadog_application_id }}
+          VITE_DD_SITE: ${{ inputs.react_app_dd_site }}
+          VITE_VERSION: ${{ inputs.version }}
+          VITE_ENV: ${{ inputs.environment }}
+          VITE_SERVICE_NAME: ${{ inputs.react_app_service_name }}
+          VITE_COGNITO_IDENTITY_POOL_ID: ${{ inputs.user_pool_id }}
+          VITE_COGNITO_APP_CLIENT_ID: ${{ inputs.user_pool_client_id }}
         run: yarn build
 
       - name: Zip distribution contents
