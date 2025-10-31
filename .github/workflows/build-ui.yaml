@@ -109,7 +109,7 @@ jobs:
           VITE_SERVICE_NAME: ${{ inputs.react_app_service_name }}
           VITE_COGNITO_IDENTITY_POOL_ID: ${{ inputs.user_pool_id }}
           VITE_COGNITO_APP_CLIENT_ID: ${{ inputs.user_pool_client_id }}
-        run: yarn build
+        run: yarn build --mode ${{ inputs.environment }}
 
       - name: Zip distribution contents
         run: |
