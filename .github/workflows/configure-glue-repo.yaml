@@ -91,7 +91,7 @@ jobs:
 
       - name: Set Environment developer-admin approval
         run: |
-          echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token 
+          echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
           team_id=$(gh api \
           -H "Accept: application/vnd.github+json" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -110,7 +110,7 @@ jobs:
               "reviewers": [
               {
                 "type": "Team",
-                "id": $team_id 
+                "id": $team_id
               }
             ]
           }
@@ -121,11 +121,11 @@ jobs:
           -H "X-GitHub-Api-Version: 2022-11-28" \
           -H "Content-Type: application/json" \
           "/repos/${{ github.repository }}/environments/developer-admin" \
-          --input payload.json 
+          --input payload.json
 
       - name: Set Environment production-admin approval
         run: |
-          echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token 
+          echo ${{ secrets.GH_TOKEN }} | gh auth login --with-token
           team_id=$(gh api \
           -H "Accept: application/vnd.github+json" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -144,7 +144,7 @@ jobs:
               "reviewers": [
               {
                 "type": "Team",
-                "id": $team_id 
+                "id": $team_id
               }
             ]
           }
@@ -155,7 +155,7 @@ jobs:
           -H "X-GitHub-Api-Version: 2022-11-28" \
           -H "Content-Type: application/json" \
           "/repos/${{ github.repository }}/environments/production-admin" \
-          --input payload.json 
+          --input payload.json
 
       - name: Set Environment Variables for Development
         run: |
