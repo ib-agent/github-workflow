@@ -40,6 +40,11 @@ on:
         description: 'version, used in dd tags'
         required: true
         type: string
+      apply:
+        description: 'Whether to run terraform apply when the plan has changes'
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   id-token: write
@@ -102,7 +107,7 @@ jobs:
 
       - name: Terraform Apply
         working-directory: ./tf
-        if: steps.plan.outputs.exitcode == '2'
+        if: inputs.apply && steps.plan.outputs.exitcode == '2'
         run: terraform apply -auto-approve plan.tfplan
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
