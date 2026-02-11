@@ -71,7 +71,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ needs.get_env.outputs.role_to_assume }}
+          role-to-assume: arn:aws:iam::${{ inputs.aws_account_id }}:role/${{ inputs.init_role }}
           aws-region: ${{ needs.get_env.outputs.aws_region }}
 
       - name: Debug AWS credentials configuration
