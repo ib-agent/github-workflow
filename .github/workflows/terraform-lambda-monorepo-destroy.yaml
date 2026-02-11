@@ -94,36 +94,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Terraform Plan - Destroy
-        id: plan-destroy
-        run: terraform plan -destroy -detailed-exitcode -out=plan.tfplan
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          TF_VAR_project_name: ${{ needs.get_env.outputs.project_name }}
-          TF_VAR_datadog_api_key_secret_arn: ${{ vars.DD_API_KEY_SECRET_ARN }}
-          TF_VAR_datadog_site: ${{ vars.DD_SITE }}
-          TF_VAR_region: ${{ needs.get_env.outputs.aws_region }}
-          TF_VAR_aws_account_id: ${{ needs.get_env.outputs.aws_account_id }}
-          TF_VAR_lambda_version: "destroy" 
-          TF_VAR_lambda_checksum: "destroy"
-
-      - name: Terraform Destroy 
-        if: steps.plan-destroy.outputs.exitcode == '2'
-        run: terraform apply -auto-approve plan.tfplan
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          TF_VAR_project_name: ${{ needs.get_env.outputs.project_name }}
-          TF_VAR_datadog_api_key_secret_arn: ${{ vars.DD_API_KEY_SECRET_ARN }}
-          TF_VAR_datadog_site: ${{ vars.DD_SITE }}
-          TF_VAR_region: ${{ needs.get_env.outputs.aws_region }}
-          TF_VAR_aws_account_id: ${{ needs.get_env.outputs.aws_account_id }}
-          TF_VAR_lambda_version: "destroy"
-          TF_VAR_lambda_checksum: "destroy"
+      - name: Terraform State Remove All Resources
+        run: |
+          echo "Removing all non-data resources from Terraform state..."
+          RESOURCES=$(terraform state list 2>/dev/null | grep -v "^data\." || true)
+          if [ -z "$RESOURCES" ]; then
+            echo "No resources in state - already clean"
+          else
+            for res in $RESOURCES; do
+              terraform state rm "$res" 2>/dev/null && echo "  Removed: $res" || echo "  Skip: $res"
+            done
+            echo "State cleanup complete"
+          fi
 
   init-destroy:
     needs:
       - get_env
       - terraform_destroy
+    if: always() && needs.get_env.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Set env
