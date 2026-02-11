@@ -163,8 +163,7 @@ jobs:
                   echo "Deleting version $version of policy $policy_arn..."
                   aws iam delete-policy-version --policy-arn "$policy_arn" --version-id "$version"
                   if [ $? -ne 0 ]; then
-                    echo "Failed to delete policy version $version"
-                    exit 1
+                    echo "Failed to delete policy version $version, continuing..."
                   fi
                 done
               fi
@@ -179,13 +178,57 @@ jobs:
           PROJECT_NAME: ${{ needs.get_env.outputs.project_name }}
         run: |
           github_action_role="$PROJECT_NAME-GitHubActionsRole"
-          if aws iam get-role --role-name $github_action_role > /dev/null 2>&1; then
-            echo "[INFO] IAM role $github_action_role found!!!"
-            echo "[INFO] Delete role: $github_action_role"
-            aws iam delete-role --role-name $github_action_role
-          else
-            echo "[INFO] IAM role $github_action_role not found!!!"
+          if ! aws iam get-role --role-name "$github_action_role" > /dev/null 2>&1; then
+            echo "[INFO] IAM role $github_action_role not found - nothing to do"
+            exit 0
           fi
+
+          echo "[INFO] IAM role $github_action_role found, cleaning up all policies..."
+
+          # 1. Detach and delete ALL managed policies
+          attached=$(aws iam list-attached-role-policies --role-name "$github_action_role" \
+            --query 'AttachedPolicies[].PolicyArn' --output text 2>/dev/null || true)
+          for policy_arn in $attached; do
+            [ -z "$policy_arn" ] && continue
+            echo "[INFO] Detaching managed policy: $policy_arn"
+            aws iam detach-role-policy --role-name "$github_action_role" --policy-arn "$policy_arn" 2>/dev/null || true
+
+            # Only delete customer-managed policies (skip AWS-managed ones)
+            if [[ "$policy_arn" != arn:aws:iam::aws:policy/* ]]; then
+              echo "[INFO] Deleting customer policy: $policy_arn"
+              # Remove non-default versions first
+              versions=$(aws iam list-policy-versions --policy-arn "$policy_arn" \
+                --query 'Versions[?IsDefaultVersion==`false`].VersionId' --output text 2>/dev/null || true)
+              for ver in $versions; do
+                [ -z "$ver" ] && continue
+                aws iam delete-policy-version --policy-arn "$policy_arn" --version-id "$ver" 2>/dev/null || true
+              done
+              aws iam delete-policy --policy-arn "$policy_arn" 2>/dev/null || true
+            fi
+          done
+
+          # 2. Delete ALL inline policies
+          inline=$(aws iam list-role-policies --role-name "$github_action_role" \
+            --query 'PolicyNames[]' --output text 2>/dev/null || true)
+          for policy_name in $inline; do
+            [ -z "$policy_name" ] && continue
+            echo "[INFO] Deleting inline policy: $policy_name"
+            aws iam delete-role-policy --role-name "$github_action_role" --policy-name "$policy_name" 2>/dev/null || true
+          done
+
+          # 3. Remove instance profiles (if any)
+          profiles=$(aws iam list-instance-profiles-for-role --role-name "$github_action_role" \
+            --query 'InstanceProfiles[].InstanceProfileName' --output text 2>/dev/null || true)
+          for profile in $profiles; do
+            [ -z "$profile" ] && continue
+            echo "[INFO] Removing role from instance profile: $profile"
+            aws iam remove-role-from-instance-profile --instance-profile-name "$profile" --role-name "$github_action_role" 2>/dev/null || true
+          done
+
+          # 4. Delete the role
+          echo "[INFO] Deleting role: $github_action_role"
+          aws iam delete-role --role-name "$github_action_role"
+          echo "[INFO] Role $github_action_role deleted successfully"
 
       - name: Check & delete dymanodb state lock table 
         env:
