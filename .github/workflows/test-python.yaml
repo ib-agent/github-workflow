@@ -24,6 +24,11 @@ on:
         description: 'AWS CodeArtifact domain'
         type: string
         default: 'cabernetai'
+      xdist_workers:
+        description: 'Number of pytest-xdist workers (0 to disable parallelism)'
+        type: string
+        required: false
+        default: '4'
 
 permissions:
   id-token: write
@@ -56,5 +61,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           XDIST_FLAG=""
-          if python -c "import xdist" 2>/dev/null; then XDIST_FLAG="-n auto"; fi
+          if [ "${{ inputs.xdist_workers }}" != "0" ] && python -c "import xdist" 2>/dev/null; then
+            XDIST_FLAG="-n ${{ inputs.xdist_workers }}"
+          fi
           pytest --cov --cov-config=.coveragerc --cov-report=term-missing:skip-covered $XDIST_FLAG

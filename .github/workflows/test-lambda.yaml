@@ -39,5 +39,5 @@ jobs:
         run: |
           cd tests/unit
           XDIST_FLAG=""
-          if python -c "import xdist" 2>/dev/null; then XDIST_FLAG="-n auto"; fi
+          if python -c "import xdist" 2>/dev/null; then XDIST_FLAG="-n 4"; fi
           pytest --cov --cov-config=.coveragerc --cov-report=term-missing:skip-covered $XDIST_FLAG
