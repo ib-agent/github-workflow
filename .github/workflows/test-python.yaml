@@ -7,7 +7,7 @@ on:
         type: string
         description: 'Python version to use'
         required: false
-        default: '3.12'  # Set the default to Python 3.12
+        default: '3.12'
       aws_region:
         description: 'AWS Region'
         required: true
@@ -24,6 +24,16 @@ on:
         description: 'AWS CodeArtifact domain'
         type: string
         default: 'cabernetai'
+      runner:
+        description: 'GitHub Actions runner label (e.g. ubuntu-latest, ubuntu-latest-8-cores)'
+        type: string
+        required: false
+        default: 'ubuntu-latest'
+      xdist_workers:
+        description: 'Number of pytest-xdist workers (0 to disable parallelism)'
+        type: string
+        required: false
+        default: '0'
 
 permissions:
   id-token: write
@@ -31,7 +41,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,6 +50,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ inputs.python_version }}
+          cache: 'pip'
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -55,4 +66,8 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest --cov --cov-config=.coveragerc --cov-report=term-missing:skip-covered
+          XDIST_FLAG=""
+          if [ "${{ inputs.xdist_workers }}" != "0" ] && python -c "import xdist" 2>/dev/null; then
+            XDIST_FLAG="-n ${{ inputs.xdist_workers }}"
+          fi
+          pytest --cov --cov-config=.coveragerc --cov-report=term-missing:skip-covered $XDIST_FLAG
