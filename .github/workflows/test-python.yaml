@@ -69,20 +69,29 @@ jobs:
           aws-region: ${{ inputs.aws_region }}
 
       - name: Install dependencies
+        env:
+          REQUIREMENTS_FILES: ${{ inputs.requirements_files }}
         run: |
           python -m pip install --upgrade pip
-          echo "${{ inputs.requirements_files }}" | while IFS= read -r file; do
+          echo "$REQUIREMENTS_FILES" | while IFS= read -r file; do
             [ -n "$file" ] && pip install -r "$file"
           done
 
       - name: Run tests with coverage
+        env:
+          XDIST_WORKERS: ${{ inputs.xdist_workers }}
+          COVERAGE_MIN: ${{ inputs.coverage_min }}
         run: |
           XDIST_FLAG=""
-          if [ "${{ inputs.xdist_workers }}" != "0" ] && python -c "import xdist" 2>/dev/null; then
-            XDIST_FLAG="-n ${{ inputs.xdist_workers }}"
+          if [ "$XDIST_WORKERS" != "0" ] && python -c "import xdist" 2>/dev/null; then
+            XDIST_FLAG="-n $XDIST_WORKERS"
           fi
           COV_MIN_FLAG=""
-          if [ -n "${{ inputs.coverage_min }}" ]; then
-            COV_MIN_FLAG="--cov-fail-under=${{ inputs.coverage_min }}"
+          if [ -n "$COVERAGE_MIN" ]; then
+            if ! echo "$COVERAGE_MIN" | grep -qE '^[0-9]+$'; then
+              echo "::error::coverage_min must be a numeric value, got: $COVERAGE_MIN"
+              exit 1
+            fi
+            COV_MIN_FLAG="--cov-fail-under=$COVERAGE_MIN"
           fi
           pytest --cov --cov-config=.coveragerc --cov-report=term-missing:skip-covered $XDIST_FLAG $COV_MIN_FLAG
